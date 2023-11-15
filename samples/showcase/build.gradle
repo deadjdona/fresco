@@ -117,7 +117,7 @@ dependencies {
     implementation project(':tools:flipper-fresco-plugin')
     implementation project(':tools:stetho')
 
-    implementation 'com.facebook.keyframes:keyframes:1.0'
+    implementation 'com.facebook.keyframes:keyframes:1.1.0'
 
     implementation project(':ui-common')
 
