@@ -28,6 +28,8 @@ import com.facebook.fresco.vito.source.ImageSource
 object VitoViewImpl2 {
   @JvmField var useVisibilityCallbacks: Supplier<Boolean> = Suppliers.BOOLEAN_TRUE
   @JvmField var useSimpleFetchLogic: Supplier<Boolean> = Suppliers.BOOLEAN_FALSE
+  @JvmField var useReleaseInViewDetached: Supplier<Boolean> = Suppliers.BOOLEAN_TRUE
+  @JvmField var useReleaseDelayedInViewDetached: Supplier<Boolean> = Suppliers.BOOLEAN_FALSE
 
   private val onAttachStateChangeListenerCallback: OnAttachStateChangeListener =
       object : OnAttachStateChangeListener {
@@ -41,7 +43,12 @@ object VitoViewImpl2 {
         override fun onViewDetachedFromWindow(view: View) {
           getDrawable(view)?.apply {
             imagePerfListener.onImageUnmount(this)
-            FrescoVitoProvider.getController().release(this)
+            if (useReleaseInViewDetached.get()) {
+              FrescoVitoProvider.getController().release(this)
+            }
+            if (useReleaseDelayedInViewDetached.get()) {
+              FrescoVitoProvider.getController().releaseDelayed(this)
+            }
           }
         }
       }
@@ -158,7 +165,7 @@ object VitoViewImpl2 {
     }
   }
 
-  private fun getDrawable(view: View): FrescoDrawableInterface? {
+  fun getDrawable(view: View): FrescoDrawableInterface? {
     return (if (view is ImageView) view.drawable else view.background) as? FrescoDrawableInterface
   }
 
