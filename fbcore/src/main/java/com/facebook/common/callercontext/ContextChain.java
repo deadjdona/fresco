@@ -9,9 +9,9 @@ package com.facebook.common.callercontext;
 
 import android.os.Parcel;
 import android.os.Parcelable;
-import com.facebook.common.internal.Objects;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 
@@ -46,6 +46,7 @@ public class ContextChain implements Parcelable {
   private String mSerializedNodeString;
 
   private static boolean sUseConcurrentHashMap = false;
+  private static boolean sUseNewHashFunction = false;
 
   public ContextChain(
       final String tag,
@@ -99,6 +100,10 @@ public class ContextChain implements Parcelable {
 
   public static void setUseConcurrentHashMap(boolean useConcurrentHashMap) {
     sUseConcurrentHashMap = useConcurrentHashMap;
+  }
+
+  public static void setUseNewHashFunction(boolean useNewHashFunction) {
+    sUseNewHashFunction = useNewHashFunction;
   }
 
   public String getName() {
@@ -184,15 +189,19 @@ public class ContextChain implements Parcelable {
       return false;
     }
     ContextChain other = (ContextChain) obj;
-    return Objects.equal(getNodeString(), other.getNodeString())
-        && (Objects.equal(mParent, other.mParent));
+    return Objects.equals(getNodeString(), other.getNodeString())
+        && (Objects.equals(mParent, other.mParent));
   }
 
   @Override
   public int hashCode() {
-    int result = super.hashCode();
-    result = 31 * result + (getNodeString().hashCode());
-    return result;
+    if (sUseNewHashFunction) {
+      return Objects.hash(mParent, getNodeString());
+    } else {
+      int result = super.hashCode();
+      result = 31 * result + (getNodeString().hashCode());
+      return result;
+    }
   }
 
   @Override
