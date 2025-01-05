@@ -11,9 +11,9 @@ import com.facebook.callercontext.CallerContextVerifier
 import com.facebook.common.executors.UiThreadImmediateExecutorService
 import com.facebook.common.internal.Supplier
 import com.facebook.common.internal.Suppliers
-import com.facebook.fresco.ui.common.ControllerListener2
 import com.facebook.fresco.vito.core.DefaultFrescoVitoConfig
 import com.facebook.fresco.vito.core.FrescoVitoConfig
+import com.facebook.fresco.vito.core.ImagePerfLoggingListener
 import com.facebook.fresco.vito.core.ImagePipelineUtils
 import com.facebook.fresco.vito.core.VitoImagePerfListener
 import com.facebook.fresco.vito.core.impl.BaseVitoImagePerfListener
@@ -23,12 +23,12 @@ import com.facebook.fresco.vito.core.impl.ImagePipelineUtilsImpl.CircularBitmapR
 import com.facebook.fresco.vito.core.impl.debug.DefaultDebugOverlayFactory2
 import com.facebook.fresco.vito.core.impl.debug.NoOpDebugOverlayFactory2
 import com.facebook.fresco.vito.nativecode.NativeCircularBitmapRounding
-import com.facebook.fresco.vito.provider.FrescoVitoProvider
+import com.facebook.fresco.vito.provider.components.FrescoVitoComponents
 import com.facebook.fresco.vito.provider.impl.DefaultFrescoVitoProvider
 import com.facebook.fresco.vito.provider.impl.NoOpCallerContextVerifier
+import com.facebook.fresco.vito.provider.setup.FrescoVitoSetup
 import com.facebook.imagepipeline.core.ImagePipeline
 import com.facebook.imagepipeline.core.ImagePipelineFactory
-import com.facebook.imagepipeline.image.ImageInfo
 import java.util.concurrent.Executor
 
 class FrescoVito {
@@ -57,8 +57,9 @@ class FrescoVito {
         vitoConfig: FrescoVitoConfig = DefaultFrescoVitoConfig(),
         callerContextVerifier: CallerContextVerifier = NoOpCallerContextVerifier,
         vitoImagePerfListener: VitoImagePerfListener = BaseVitoImagePerfListener(),
-        imagePerfListenerSupplier: Supplier<ControllerListener2<ImageInfo>>? = null,
-        showExtendedDebugOverlayInformation: Boolean = true
+        imagePerfListenerSupplier: Supplier<ImagePerfLoggingListener>? = null,
+        showExtendedDebugOverlayInformation: Boolean = true,
+        showExtendedImageSourceExtraInformation: Boolean = false,
     ) {
       if (isInitialized) {
         return
@@ -78,7 +79,10 @@ class FrescoVito {
               callerContextVerifier,
               vitoImagePerfListener,
               debugOverlayEnabledSupplier?.let {
-                DefaultDebugOverlayFactory2(showExtendedDebugOverlayInformation, it)
+                DefaultDebugOverlayFactory2(
+                    showExtendedDebugOverlayInformation,
+                    showExtendedImageSourceExtraInformation,
+                    it)
               } ?: NoOpDebugOverlayFactory2(),
               imagePerfListenerSupplier))
     }
@@ -90,11 +94,11 @@ class FrescoVito {
      * @param providerImplementation the provider implementation to be used
      */
     @Synchronized
-    fun initialize(providerImplementation: FrescoVitoProvider.Implementation) {
+    fun initialize(providerImplementation: FrescoVitoSetup) {
       if (isInitialized) {
         return
       }
-      FrescoVitoProvider.setImplementation(providerImplementation)
+      FrescoVitoComponents.setImplementation(providerImplementation)
       isInitialized = true
     }
 

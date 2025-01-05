@@ -7,21 +7,20 @@
 
 package com.facebook.imagepipeline.producers;
 
+import static com.facebook.common.util.UriUtil.getRealPathFromUri;
+
 import android.content.ContentResolver;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.media.MediaMetadataRetriever;
 import android.media.ThumbnailUtils;
 import android.net.Uri;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
-import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import androidx.annotation.VisibleForTesting;
 import com.facebook.common.internal.ImmutableMap;
 import com.facebook.common.internal.Preconditions;
 import com.facebook.common.references.CloseableReference;
-import com.facebook.common.util.UriUtil;
 import com.facebook.fresco.middleware.HasExtraData;
 import com.facebook.imagepipeline.bitmaps.SimpleBitmapReleaser;
 import com.facebook.imagepipeline.image.CloseableImage;
@@ -30,6 +29,7 @@ import com.facebook.imagepipeline.image.ImmutableQualityInfo;
 import com.facebook.imagepipeline.request.ImageRequest;
 import com.facebook.infer.annotation.Nullsafe;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
@@ -145,47 +145,30 @@ public class LocalVideoThumbnailProducer implements Producer<CloseableReference<
   @Nullable
   private String getLocalFilePath(ImageRequest imageRequest) {
     Uri uri = imageRequest.getSourceUri();
-    if (UriUtil.isLocalFileUri(uri)) {
-      return imageRequest.getSourceFile().getPath();
-    } else if (UriUtil.isLocalContentUri(uri)) {
-      String selection = null;
-      String[] selectionArgs = null;
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT
-          && "com.android.providers.media.documents".equals(uri.getAuthority())) {
-        String documentId = DocumentsContract.getDocumentId(uri);
-        Preconditions.checkNotNull(documentId);
-        uri = Preconditions.checkNotNull(MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
-        selection = MediaStore.Video.Media._ID + "=?";
-        selectionArgs = new String[] {documentId.split(":")[1]};
-      }
-      Cursor cursor =
-          mContentResolver.query(
-              uri, new String[] {MediaStore.Video.Media.DATA}, selection, selectionArgs, null);
-      try {
-        if (cursor != null && cursor.moveToFirst()) {
-          return cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA));
-        }
-      } finally {
-        if (cursor != null) {
-          cursor.close();
-        }
-      }
-    }
-    return null;
+    return getRealPathFromUri(mContentResolver, uri);
   }
 
   @Nullable
   private static Bitmap createThumbnailFromContentProvider(
       ContentResolver contentResolver, Uri uri) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.GINGERBREAD_MR1) {
+      MediaMetadataRetriever mediaMetadataRetriever = null;
       try {
         ParcelFileDescriptor videoFile = contentResolver.openFileDescriptor(uri, "r");
         Preconditions.checkNotNull(videoFile);
-        MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
+        mediaMetadataRetriever = new MediaMetadataRetriever();
         mediaMetadataRetriever.setDataSource(videoFile.getFileDescriptor());
         return mediaMetadataRetriever.getFrameAtTime(-1);
       } catch (FileNotFoundException e) {
         return null;
+      } finally {
+        if (mediaMetadataRetriever != null) {
+          try {
+            mediaMetadataRetriever.release();
+          } catch (IOException ex) {
+            // Nothing to do.
+          }
+        }
       }
     } else {
       return null;

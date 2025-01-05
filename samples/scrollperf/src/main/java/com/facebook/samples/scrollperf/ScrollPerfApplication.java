@@ -8,9 +8,9 @@
 package com.facebook.samples.scrollperf;
 
 import android.app.Application;
-import com.facebook.common.webp.WebpSupportStatus;
-import com.facebook.drawee.backends.pipeline.DraweeConfig;
+import com.facebook.common.internal.Suppliers;
 import com.facebook.drawee.backends.pipeline.Fresco;
+import com.facebook.fresco.vito.init.FrescoVito;
 import com.facebook.imagepipeline.core.DefaultExecutorSupplier;
 import com.facebook.imagepipeline.core.ImagePipelineConfig;
 import com.facebook.imagepipeline.core.MemoryChunkType;
@@ -31,9 +31,6 @@ public class ScrollPerfApplication extends Application {
         ImagePipelineConfig.newBuilder(this)
             .setResizeAndRotateEnabledForNetwork(false)
             .setDownsampleEnabled(config.downsampling);
-    if (WebpSupportStatus.sIsWebpSupportRequired) {
-      imagePipelineConfigBuilder.experiment().setWebpSupportEnabled(config.webpSupportEnabled);
-    }
     if (config.decodingThreadCount == 0) {
       imagePipelineConfigBuilder.setExecutorSupplier(
           new DefaultExecutorSupplier(Const.NUMBER_OF_PROCESSORS));
@@ -42,13 +39,12 @@ public class ScrollPerfApplication extends Application {
           new ScrollPerfExecutorSupplier(Const.NUMBER_OF_PROCESSORS, config.decodingThreadCount));
     }
     imagePipelineConfigBuilder.experiment().setDecodeCancellationEnabled(config.decodeCancellation);
-    DraweeConfig draweeConfig =
-        DraweeConfig.newBuilder().setDrawDebugOverlay(config.draweeOverlayEnabled).build();
     if (BuildConfig.FLAVOR == "noNativeCode") {
       imagePipelineConfigBuilder.setMemoryChunkType(MemoryChunkType.BUFFER_MEMORY);
-      Fresco.initialize(this, imagePipelineConfigBuilder.build(), draweeConfig, false);
+      Fresco.initialize(this, imagePipelineConfigBuilder.build(), null, false);
     } else {
-      Fresco.initialize(this, imagePipelineConfigBuilder.build(), draweeConfig, true);
+      Fresco.initialize(this, imagePipelineConfigBuilder.build(), null, true);
     }
+    FrescoVito.initialize(null, null, null, Suppliers.of(config.vitoOverlayEnabled));
   }
 }

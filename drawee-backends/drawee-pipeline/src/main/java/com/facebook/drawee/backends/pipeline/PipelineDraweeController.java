@@ -30,8 +30,9 @@ import com.facebook.drawee.controller.AbstractDraweeController;
 import com.facebook.drawee.controller.AbstractDraweeControllerBuilder;
 import com.facebook.drawee.debug.DebugControllerOverlayDrawable;
 import com.facebook.drawee.debug.listener.ImageLoadingTimeControllerListener;
+import com.facebook.drawee.drawable.ArrayDrawable;
+import com.facebook.drawee.drawable.DrawableParent;
 import com.facebook.drawee.drawable.ScaleTypeDrawable;
-import com.facebook.drawee.drawable.ScalingUtils;
 import com.facebook.drawee.drawable.ScalingUtils.ScaleType;
 import com.facebook.drawee.interfaces.DraweeController;
 import com.facebook.drawee.interfaces.DraweeHierarchy;
@@ -46,6 +47,7 @@ import com.facebook.imagepipeline.listener.ForwardingRequestListener;
 import com.facebook.imagepipeline.listener.RequestListener;
 import com.facebook.imagepipeline.request.ImageRequest;
 import com.facebook.imagepipeline.systrace.FrescoSystrace;
+import com.facebook.infer.annotation.Nullsafe;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -59,6 +61,7 @@ import javax.annotation.concurrent.GuardedBy;
  * <p>The hierarchy's actual image is set to the image(s) obtained by the provided data source. The
  * data source is automatically obtained and closed based on attach / detach calls.
  */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class PipelineDraweeController
     extends AbstractDraweeController<CloseableReference<CloseableImage>, ImageInfo> {
 
@@ -72,9 +75,11 @@ public class PipelineDraweeController
 
   private final @Nullable MemoryCache<CacheKey, CloseableImage> mMemoryCache;
 
+  // NULLSAFE_FIXME[Field Not Initialized]
   private CacheKey mCacheKey;
 
   // Constant state (non-final because controllers can be reused)
+  // NULLSAFE_FIXME[Field Not Initialized]
   private Supplier<DataSource<CloseableReference<CloseableImage>>> mDataSourceSupplier;
 
   private boolean mDrawDebugOverlay;
@@ -103,6 +108,7 @@ public class PipelineDraweeController
       Executor uiThreadExecutor,
       @Nullable MemoryCache<CacheKey, CloseableImage> memoryCache,
       @Nullable ImmutableList<DrawableFactory> globalDrawableFactories) {
+    // NULLSAFE_FIXME[Parameter Not Nullable]
     super(deferredReleaser, uiThreadExecutor, null, null);
     mResources = resources;
     mDefaultDrawableFactory = new DefaultDrawableFactory(resources, animatedDrawableFactory);
@@ -145,14 +151,13 @@ public class PipelineDraweeController
               ImageRequest,
               CloseableReference<CloseableImage>,
               ImageInfo>
-          builder,
-      Supplier<Boolean> asyncLogging) {
+          builder) {
     if (mImagePerfMonitor != null) {
       mImagePerfMonitor.reset();
     }
     if (imagePerfDataListener != null) {
       if (mImagePerfMonitor == null) {
-        mImagePerfMonitor = new ImagePerfMonitor(AwakeTimeSinceBootClock.get(), this, asyncLogging);
+        mImagePerfMonitor = new ImagePerfMonitor(AwakeTimeSinceBootClock.get(), this);
       }
       mImagePerfMonitor.addImagePerfDataListener(imagePerfDataListener);
       mImagePerfMonitor.setEnabled(true);
@@ -336,7 +341,7 @@ public class PipelineDraweeController
     ScaleType scaleType = null;
     if (draweeHierarchy != null) {
       final ScaleTypeDrawable scaleTypeDrawable =
-          ScalingUtils.getActiveScaleTypeDrawable(draweeHierarchy.getTopLevelDrawable());
+          getActiveScaleTypeDrawable(draweeHierarchy.getTopLevelDrawable());
       scaleType = scaleTypeDrawable != null ? scaleTypeDrawable.getScaleType() : null;
     }
     debugOverlay.setScaleType(scaleType);
@@ -445,5 +450,29 @@ public class PipelineDraweeController
       return null;
     }
     return cc.toString();
+  }
+
+  @Nullable
+  public static ScaleTypeDrawable getActiveScaleTypeDrawable(@Nullable Drawable drawable) {
+    if (drawable == null) {
+      return null;
+    } else if (drawable instanceof ScaleTypeDrawable) {
+      return (ScaleTypeDrawable) drawable;
+    } else if (drawable instanceof DrawableParent) {
+      final Drawable childDrawable = ((DrawableParent) drawable).getDrawable();
+      return getActiveScaleTypeDrawable(childDrawable);
+    } else if (drawable instanceof ArrayDrawable) {
+      final ArrayDrawable fadeDrawable = (ArrayDrawable) drawable;
+      final int numLayers = fadeDrawable.getNumberOfLayers();
+
+      for (int i = 0; i < numLayers; i++) {
+        final Drawable childDrawable = fadeDrawable.getDrawable(i);
+        final ScaleTypeDrawable result = getActiveScaleTypeDrawable(childDrawable);
+        if (result != null) {
+          return result;
+        }
+      }
+    }
+    return null;
   }
 }

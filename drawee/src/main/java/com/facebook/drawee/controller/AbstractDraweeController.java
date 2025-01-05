@@ -34,9 +34,10 @@ import com.facebook.fresco.middleware.MiddlewareUtils;
 import com.facebook.fresco.ui.common.ControllerListener2;
 import com.facebook.fresco.ui.common.ControllerListener2.Extras;
 import com.facebook.fresco.ui.common.ForwardingControllerListener2;
-import com.facebook.fresco.ui.common.LoggingListener;
+import com.facebook.fresco.ui.common.LegacyOnFadeListener;
 import com.facebook.fresco.ui.common.OnFadeListener;
 import com.facebook.imagepipeline.systrace.FrescoSystrace;
+import com.facebook.infer.annotation.Nullsafe;
 import com.facebook.infer.annotation.ReturnsOwnership;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -52,6 +53,7 @@ import javax.annotation.concurrent.NotThreadSafe;
  * @param <T> image type (e.g. Bitmap)
  * @param <INFO> image info type (can be same as T)
  */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 @NotThreadSafe
 public abstract class AbstractDraweeController<T, INFO>
     implements DraweeController, DeferredReleaser.Releasable, GestureDetector.ClickListener {
@@ -97,7 +99,7 @@ public abstract class AbstractDraweeController<T, INFO>
   protected @Nullable ControllerListener<INFO> mControllerListener;
   protected ForwardingControllerListener2<INFO> mControllerListener2 =
       new ForwardingControllerListener2<>();
-  protected @Nullable LoggingListener mLoggingListener;
+  protected @Nullable LegacyOnFadeListener mLegacyOnFadeListener;
 
   // Hierarchy
   private @Nullable SettableDraweeHierarchy mSettableDraweeHierarchy;
@@ -176,6 +178,7 @@ public abstract class AbstractDraweeController<T, INFO>
     // clear hierarchy and controller overlay
     if (mSettableDraweeHierarchy != null) {
       mSettableDraweeHierarchy.reset();
+      // NULLSAFE_FIXME[Parameter Not Nullable]
       mSettableDraweeHierarchy.setControllerOverlay(null);
       mSettableDraweeHierarchy = null;
     }
@@ -190,7 +193,7 @@ public abstract class AbstractDraweeController<T, INFO>
       FrescoSystrace.endSection();
     }
 
-    if (mLoggingListener != null) {
+    if (mLegacyOnFadeListener != null) {
       setUpLoggingListener();
     }
   }
@@ -285,6 +288,7 @@ public abstract class AbstractDraweeController<T, INFO>
 
   /** Gets accessibility content description. */
   @Override
+  // NULLSAFE_FIXME[Inconsistent Subclass Return Annotation]
   public @Nullable String getContentDescription() {
     return mContentDescription;
   }
@@ -320,12 +324,12 @@ public abstract class AbstractDraweeController<T, INFO>
     mControllerListener2.removeListener(controllerListener2);
   }
 
-  public void setLoggingListener(final LoggingListener loggingListener) {
-    mLoggingListener = loggingListener;
+  public void setLoggingListener(final LegacyOnFadeListener legacyOnFadeListener) {
+    mLegacyOnFadeListener = legacyOnFadeListener;
   }
 
-  protected @Nullable LoggingListener getLoggingListener() {
-    return mLoggingListener;
+  protected @Nullable LegacyOnFadeListener getLoggingListener() {
+    return mLegacyOnFadeListener;
   }
 
   /** Removes controller listener. */
@@ -375,6 +379,7 @@ public abstract class AbstractDraweeController<T, INFO>
   public void setHierarchy(@Nullable DraweeHierarchy hierarchy) {
     if (FLog.isLoggable(FLog.VERBOSE)) {
       FLog.v(
+          // NULLSAFE_FIXME[Parameter Not Nullable]
           TAG, "controller %x %s: setHierarchy: %s", System.identityHashCode(this), mId, hierarchy);
     }
     mEventTracker.recordEvent(
@@ -386,6 +391,7 @@ public abstract class AbstractDraweeController<T, INFO>
     }
     // clear the existing hierarchy
     if (mSettableDraweeHierarchy != null) {
+      // NULLSAFE_FIXME[Parameter Not Nullable]
       mSettableDraweeHierarchy.setControllerOverlay(null);
       mSettableDraweeHierarchy = null;
     }
@@ -393,10 +399,11 @@ public abstract class AbstractDraweeController<T, INFO>
     if (hierarchy != null) {
       Preconditions.checkArgument(hierarchy instanceof SettableDraweeHierarchy);
       mSettableDraweeHierarchy = (SettableDraweeHierarchy) hierarchy;
+      // NULLSAFE_FIXME[Parameter Not Nullable]
       mSettableDraweeHierarchy.setControllerOverlay(mControllerOverlay);
     }
 
-    if (mLoggingListener != null) {
+    if (mLegacyOnFadeListener != null) {
       setUpLoggingListener();
     }
   }
@@ -408,8 +415,8 @@ public abstract class AbstractDraweeController<T, INFO>
               new OnFadeListener() {
                 @Override
                 public void onFadeFinished() {
-                  if (mLoggingListener != null) {
-                    mLoggingListener.onFadeFinished(mId);
+                  if (mLegacyOnFadeListener != null) {
+                    mLegacyOnFadeListener.onFadeFinished(mId);
                   }
                 }
 
@@ -418,8 +425,8 @@ public abstract class AbstractDraweeController<T, INFO>
 
                 @Override
                 public void onFadeStarted() {
-                  if (mLoggingListener != null) {
-                    mLoggingListener.onFadeStarted(mId);
+                  if (mLegacyOnFadeListener != null) {
+                    mLegacyOnFadeListener.onFadeStarted(mId);
                   }
                 }
               });
@@ -430,6 +437,7 @@ public abstract class AbstractDraweeController<T, INFO>
   protected void setControllerOverlay(@Nullable Drawable controllerOverlay) {
     mControllerOverlay = controllerOverlay;
     if (mSettableDraweeHierarchy != null) {
+      // NULLSAFE_FIXME[Parameter Not Nullable]
       mSettableDraweeHierarchy.setControllerOverlay(mControllerOverlay);
     }
   }
@@ -525,7 +533,9 @@ public abstract class AbstractDraweeController<T, INFO>
       FLog.v(TAG, "controller %x %s: onClick", System.identityHashCode(this), mId);
     }
     if (shouldRetryOnTap()) {
+      // NULLSAFE_FIXME[Nullable Dereference]
       mRetryManager.notifyTapToRetry();
+      // NULLSAFE_FIXME[Nullable Dereference]
       mSettableDraweeHierarchy.reset();
       submitRequest();
       return true;
@@ -546,8 +556,10 @@ public abstract class AbstractDraweeController<T, INFO>
       mIsRequestSubmitted = true;
       mHasFetchFailed = false;
       mEventTracker.recordEvent(Event.ON_SUBMIT_CACHE_HIT);
+      // NULLSAFE_FIXME[Parameter Not Nullable]
       reportSubmit(mDataSource, getImageInfo(closeableImage));
       onImageLoadedFromCacheImmediately(mId, closeableImage);
+      // NULLSAFE_FIXME[Parameter Not Nullable]
       onNewResultInternal(mId, mDataSource, closeableImage, 1.0f, true, true, true);
       if (FrescoSystrace.isTracing()) {
         FrescoSystrace.endSection();
@@ -558,6 +570,7 @@ public abstract class AbstractDraweeController<T, INFO>
       return;
     }
     mEventTracker.recordEvent(Event.ON_DATASOURCE_SUBMIT);
+    // NULLSAFE_FIXME[Nullable Dereference]
     mSettableDraweeHierarchy.setProgress(0, true);
     mIsRequestSubmitted = true;
     mHasFetchFailed = false;
@@ -593,6 +606,7 @@ public abstract class AbstractDraweeController<T, INFO>
 
           @Override
           public void onFailureImpl(DataSource<T> dataSource) {
+            // NULLSAFE_FIXME[Parameter Not Nullable]
             onFailureInternal(id, dataSource, dataSource.getFailureCause(), /* isFinished */ true);
           }
 
@@ -726,11 +740,13 @@ public abstract class AbstractDraweeController<T, INFO>
       String id, DataSource<T> dataSource, float progress, boolean isFinished) {
     // ignore late callbacks (data source that failed is not the one we expected)
     if (!isExpectedDataSource(id, dataSource)) {
+      // NULLSAFE_FIXME[Parameter Not Nullable]
       logMessageAndFailure("ignore_old_datasource @ onProgress", null);
       dataSource.close();
       return;
     }
     if (!isFinished) {
+      // NULLSAFE_FIXME[Nullable Dereference]
       mSettableDraweeHierarchy.setProgress(progress, false);
     }
   }
@@ -772,6 +788,7 @@ public abstract class AbstractDraweeController<T, INFO>
   }
 
   @Override
+  // NULLSAFE_FIXME[Inconsistent Subclass Return Annotation]
   public @Nullable Animatable getAnimatable() {
     return (mDrawable instanceof Animatable) ? (Animatable) mDrawable : null;
   }
@@ -873,7 +890,8 @@ public abstract class AbstractDraweeController<T, INFO>
 
   protected @Nullable Uri getMainUri() {
     return null;
-  };
+  }
+  ;
 
   private Extras obtainExtras(
       @Nullable DataSource<T> datasource, @Nullable INFO info, @Nullable Uri mainUri) {

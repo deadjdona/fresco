@@ -10,15 +10,19 @@ package com.facebook.fresco.buildsrc
 object GradleDeps {
 
   object Android {
-    private const val version = "7.4.2"
+    private const val version = "8.5.2"
 
     const val gradlePlugin = "com.android.tools.build:gradle:$version"
   }
 
   object Kotlin {
-    const val version = "1.8.21"
+    const val version = "2.0.0"
     const val gradlePlugin = "org.jetbrains.kotlin:kotlin-gradle-plugin:$version"
     const val stdlib = "org.jetbrains.kotlin:kotlin-stdlib:$version"
+  }
+
+  object Native {
+    const val version = "27.1.12297006"
   }
 
   object Publishing {

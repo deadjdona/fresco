@@ -12,14 +12,16 @@ import com.facebook.infer.annotation.Nullsafe;
 import javax.annotation.Nullable;
 
 /** Generic tri-state enum for boolean values that can also be unset. */
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public enum TriState {
   YES,
   NO,
   UNSET,
   ;
 
-  /** @return whether this value is set; that is, whether it is YES or NO. */
+  /**
+   * @return whether this value is set; that is, whether it is YES or NO.
+   */
   @Functional
   public boolean isSet() {
     return this != UNSET;

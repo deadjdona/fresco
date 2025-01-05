@@ -25,14 +25,14 @@ import javax.annotation.concurrent.GuardedBy;
  * ProducerContext that can be cancelled. Exposes low level API to manipulate state of the
  * ProducerContext.
  */
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class BaseProducerContext implements ProducerContext {
 
   private static final String ORIGIN_SUBCATEGORY_DEFAULT = "default";
 
   public static final Set<String> INITIAL_KEYS =
       ImmutableSet.of(HasExtraData.KEY_ID, HasExtraData.KEY_URI_SOURCE);
-  private static final Object CALLER_CONTEXT_UNSET = new Object();
+  public static final Object CALLER_CONTEXT_UNSET = new Object();
 
   private final ImageRequest mImageRequest;
   private final String mId;

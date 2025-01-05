@@ -7,9 +7,9 @@
 
 package com.facebook.fresco.vito.core
 
+import com.facebook.common.callercontext.ContextChain
 import com.facebook.common.internal.Supplier
 import com.facebook.common.internal.Suppliers
-import com.facebook.fresco.vito.core.DefaultFrescoVitoConfig.DefaultPrefetchConfig
 
 open class DefaultFrescoVitoConfig
 @JvmOverloads
@@ -28,8 +28,6 @@ constructor(override val prefetchConfig: PrefetchConfig = DefaultPrefetchConfig(
 
   override fun useSmartPropertyDiffing(): Boolean = false
 
-  override fun stopAnimationInOnRelease(): Boolean = false
-
   override fun onlyStopAnimationWhenAutoPlayEnabled(): Boolean = true
 
   override fun fastPathForEmptyRequests(): Boolean = false
@@ -38,21 +36,46 @@ constructor(override val prefetchConfig: PrefetchConfig = DefaultPrefetchConfig(
 
   override fun handleImageResultInBackground(): Boolean = false
 
+  override fun useIntermediateImagesAsPlaceholder(): Boolean = false
+
+  override fun fallbackToDefaultImageOptions(): Boolean = false
+
+  override fun experimentalDynamicSizeVito2(): Boolean = false
+
+  override fun experimentalDynamicSizeWithCacheFallbackVito2(): Boolean = false
+
+  override fun experimentalDynamicSizeOnPrepareMainThreadVito2(): Boolean = false
+
+  override fun experimentalDynamicSizeDiskCacheCheckTimeoutMs(): Long = 0
+
+  override fun experimentalDynamicSizeUseSfOnDiskCacheTimeout(): Boolean = false
+
+  override fun isAppStarting(): Boolean = false
+
+  override fun experimentalDynamicSizeDisableWhenAppIsStarting(): Boolean = false
+
+  override fun experimentalDynamicSizeCheckIfProductIsEnabled(): Boolean = false
+
+  override fun experimentalDynamicSizeIsProductEnabled(
+      callerContext: Any?,
+      contextChain: ContextChain?
+  ): Boolean = true
+
+  override fun experimentalResetVitoImageRequestListener() = false
+
+  override fun experimentalResetLocalVitoImageRequestListener() = false
+
+  override fun experimentalResetLocalImagePerfStateListener() = false
+
+  override fun experimentalResetControllerListener2() = false
+
   open class DefaultPrefetchConfig : PrefetchConfig {
     override fun prefetchInOnPrepare(): Boolean = true
 
+    override fun prefetchInOnBoundsDefinedForDynamicSize(): Boolean = false
+
     override fun prefetchTargetOnPrepare(): PrefetchTarget = PrefetchTarget.MEMORY_DECODED
 
-    override fun cancelOnPreparePrefetchWhenWorkingRangePrefetch(): Boolean = true
-
-    override fun cancelPrefetchWhenFetched(): Boolean = true
-
-    override fun prefetchWithWorkingRange(): Boolean = true
-
-    override fun prefetchWorkingRangeSize(): Int = 3
-
-    override fun prefetchTargetWorkingRange(): PrefetchTarget = PrefetchTarget.MEMORY_DECODED
-
-    override fun prioritizeWithWorkingRange(): Boolean = false
+    override fun prefetchTargetOnBoundsDefined(): PrefetchTarget = PrefetchTarget.MEMORY_DECODED
   }
 }

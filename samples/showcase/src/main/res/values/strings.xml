@@ -18,7 +18,7 @@
   <string name="drawee_media_picker_no_image">No image selected.</string>
   <string name="drawee_media_picker_button_action_pick">ACTION_PICK</string>
 
-  <string name="drawee_scale_type_help">Select either the landscape or portrait picture. Then select a scale type to apply for the large Drawee.</string>
+  <string name="vito_scale_type_help">Select either the landscape or portrait picture. Then select a scale type to apply for the large image.</string>
 
   <string name="drawee_span_simple_text">Text with an # inline image using a DraweeSpan. Also works with @ animated images!</string>
   <string name="drawee_span_simple_help">This example shows how to render text with an inline image. Change the scale type using the drop-down menu.</string>
@@ -33,6 +33,7 @@
 
   <string name="drawee_multi_uri_help">Example to load an image based on a set of URIs, either as "first available" or with "increasing quality".</string>
 
+  <string name="imagepipeline_downsample_help" description="Helper text for downsample example">Change the downsample mode using the drop-down menu on top.</string>
 
   <string name="imagepipeline_notification_button">Create Notification</string>
   <string name="imagepipeline_notification_content_title">Fresco Says Hello</string>
@@ -88,9 +89,9 @@
   <string name="format_gif_label_medium">Medium (512x512 px)</string>
   <string name="format_gif_label_large">Large (1024x1024 px)</string>
 
-  <string name="format_webp_static_help">The above Drawee displays a lossy WebP image.</string>
-  <string name="format_webp_translucent_help">The above Drawee displays a loss-less WebP image with semi-transparent areas.</string>
-  <string name="format_webp_animated_help">The above Drawee displays an animated WebP image</string>
+  <string name="format_webp_static_help">The above image displays a lossy WebP image.</string>
+  <string name="format_webp_translucent_help">The above image displays a loss-less WebP image with semi-transparent areas.</string>
+  <string name="format_webp_animated_help">The above image displays an animated WebP image</string>
 
   <string name="format_pjpeg_help">Select a progressive JPEG from the spinner and enable or disable progessive JPEG support with the switch.</string>
   <string name="format_pjpeg_switch_rendering_enabled">Progressive JPEG rendering enabled</string>
@@ -110,6 +111,8 @@
   <string name="format_override_help">This example overrides the decoder to be used for the given image. You can use this approach if you do not want to set a global custom decoder. The image will be decoded correctly even if global color decoding is disabled.</string>
 
   <string name="format_datauri_help">Images can also be provided by data URIs such as the one below:</string>
+
+  <string name="format_xml_help" description="Helper text for xml example">This example showcases different binary XML file types. Select different binary XML types from the spinner.</string>
 
   <string name="vito_litho_image_options_config_help_source">Configure the image source to be displayed</string>
   <string name="vito_litho_image_options_config_help_options">Configure image options to change the image\'s appearance</string>
@@ -168,7 +171,8 @@
   <string name="welcome_button_github">GitHub</string>
   <string name="welcome_button_doc">Documentation</string>
 
-  <string name="button_clear_cache">Clear Cache</string>
+  <string name="button_clear_cache">Clear Cache (all)</string>
+  <string name="button_clear_cache_single_item">Clear Cache (single item)</string>
   <string name="button_prefetch_disk">Prefetch Disk</string>
   <string name="button_prefetch_encoded">Prefetch Encoded</string>
   <string name="button_prefetch_bitmap">Prefetch Bitmap</string>
@@ -181,15 +185,12 @@
   <string name="snackbar_uri_override_reminder_text">URI override is active</string>
   <string name="snackbar_uri_override_reminder_change_button">Change</string>
 
-  <string name="drawee_rounded_corners_as_circle">Using roundAsCircle</string>
-  <string name="drawee_rounded_corners_radius">16dp corner radius</string>
-  <string name="drawee_rounded_corners_some">Only rounding some corners</string>
-  <string name="drawee_rounded_corners_some_rtl">Only rounding some corners (RTL supported)</string>
-  <string name="drawee_rounded_corners_fancy">Fancy (different radii)</string>
-  <string name="drawee_rounded_corners_borders">Borders</string>
-  <string name="drawee_rounded_corners_scale_inside_borders">Scale inside borders</string>
-  <string name="drawee_rounded_corners_color_overlay">Use color overlay</string>
-  <string name="drawee_rounded_corners_fix_repeated_edges">Fix repeated edges</string>
+  <string name="image_rounded_corners_as_circle">Using roundAsCircle</string>
+  <string name="image_rounded_corners_radius">16dp corner radius</string>
+  <string name="image_rounded_corners_some">Only rounding some corners</string>
+  <string name="image_rounded_corners_fancy">Fancy (different radii)</string>
+  <string name="image_rounded_corners_borders">Borders</string>
+  <string name="image_rounded_corners_scale_inside_borders">Scale inside borders</string>
 
   <string name="drawee_hierarchy_load_success">Load (success)</string>
   <string name="drawee_hierarchy_load_fail">Load (fail)</string>
@@ -220,7 +221,6 @@
   <string name="vito_view_prefetch_title">Prefetch to cache:</string>
   <string name="vito_view_ktx_help">Vito View Kotlin Extensions examples</string>
 
-  <string name="use_vito">Use Vito</string>
   <string name="preferences_category_vito">Vito</string>
   <string name="preference_vito_use_kotlin">Use Kotlin implementation</string>
   <string name="preference_vito_use_kotlin_summary">(requires restart)</string>

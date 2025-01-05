@@ -7,17 +7,18 @@
 
 package com.facebook.fresco.vito.core
 
+import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import com.facebook.drawee.drawable.VisibilityCallback
-import com.facebook.fresco.ui.common.ControllerListener2
+import com.facebook.fresco.ui.common.VisibilityAware
 import com.facebook.fresco.vito.listener.ImageListener
-import com.facebook.imagepipeline.image.ImageInfo
 
-interface FrescoDrawableInterface {
+interface FrescoDrawableInterface : VisibilityAware {
 
   val imageId: Long
   var callerContext: Any?
   val imagePerfListener: VitoImagePerfListener
+  var uiFramework: String?
 
   fun setMutateDrawables(mutateDrawables: Boolean)
 
@@ -26,6 +27,9 @@ interface FrescoDrawableInterface {
   fun hasImage(): Boolean
 
   val isFetchSubmitted: Boolean
+
+  fun setFetchSubmitted(fetchSubmitted: Boolean)
+
   var imageRequest: VitoImageRequest?
 
   fun setVisibilityCallback(visibilityCallback: VisibilityCallback?)
@@ -45,5 +49,16 @@ interface FrescoDrawableInterface {
    */
   var refetchRunnable: Runnable?
 
-  fun getImagePerfControllerListener(): ControllerListener2<ImageInfo>?
+  fun getImagePerfLoggingListener(): ImagePerfLoggingListener?
+
+  fun setIntrinsicSize(width: Int, height: Int)
+
+  /**
+   * Configure the image, bounds, scale and reset the render command. Call it only when you are sure
+   * that underlying image has changed.
+   */
+  fun configureWhenUnderlyingChanged()
+
+  /** Gets the non-cropped post-scaling bounds of the actual image. */
+  fun getActualImageBounds(outBounds: RectF)
 }

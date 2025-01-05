@@ -9,10 +9,10 @@ package com.facebook.fresco.vito.provider.impl
 
 import com.facebook.callercontext.CallerContextVerifier
 import com.facebook.common.internal.Supplier
-import com.facebook.fresco.ui.common.ControllerListener2
 import com.facebook.fresco.vito.core.FrescoController2
 import com.facebook.fresco.vito.core.FrescoVitoConfig
 import com.facebook.fresco.vito.core.FrescoVitoPrefetcher
+import com.facebook.fresco.vito.core.ImagePerfLoggingListener
 import com.facebook.fresco.vito.core.ImagePipelineUtils
 import com.facebook.fresco.vito.core.VitoImagePerfListener
 import com.facebook.fresco.vito.core.VitoImagePipeline
@@ -26,11 +26,9 @@ import com.facebook.fresco.vito.drawable.ArrayVitoDrawableFactory
 import com.facebook.fresco.vito.drawable.BitmapDrawableFactory
 import com.facebook.fresco.vito.draweesupport.DrawableFactoryWrapper
 import com.facebook.fresco.vito.options.ImageOptionsDrawableFactory
-import com.facebook.fresco.vito.provider.FrescoVitoProvider
+import com.facebook.fresco.vito.provider.setup.FrescoVitoSetup
 import com.facebook.imagepipeline.core.ImagePipeline
 import com.facebook.imagepipeline.core.ImagePipelineFactory
-import com.facebook.imagepipeline.image.ImageInfo
-import java.lang.RuntimeException
 import java.util.concurrent.Executor
 
 class DefaultFrescoVitoProvider(
@@ -42,8 +40,8 @@ class DefaultFrescoVitoProvider(
     callerContextVerifier: CallerContextVerifier,
     vitoImagePerfListener: VitoImagePerfListener,
     debugOverlayFactory: DebugOverlayFactory2 = NoOpDebugOverlayFactory2(),
-    imagePerfListenerSupplier: Supplier<ControllerListener2<ImageInfo>>? = null,
-) : FrescoVitoProvider.Implementation {
+    imagePerfListenerSupplier: Supplier<ImagePerfLoggingListener>? = null,
+) : FrescoVitoSetup {
 
   private val frescoController: FrescoController2
 
@@ -58,7 +56,7 @@ class DefaultFrescoVitoProvider(
     }
     frescoVitoPrefetcher =
         FrescoVitoPrefetcherImpl(imagePipeline, imagePipelineUtils, callerContextVerifier)
-    vitoImagePipeline = VitoImagePipelineImpl(imagePipeline, imagePipelineUtils)
+    vitoImagePipeline = VitoImagePipelineImpl(imagePipeline, imagePipelineUtils, frescoVitoConfig)
     frescoController =
         FrescoController2Impl(
             frescoVitoConfig,
@@ -83,16 +81,16 @@ class DefaultFrescoVitoProvider(
   companion object {
     private fun createDefaultDrawableFactory(): ImageOptionsDrawableFactory {
       val animatedDrawableFactory =
-          ImagePipelineFactory.getInstance().getAnimatedDrawableFactory(null)
+          ImagePipelineFactory.getInstance()
+              .getAnimatedDrawableFactory(null)
+              ?.let(DrawableFactoryWrapper::wrap)
       val bitmapFactory = BitmapDrawableFactory()
-      return if (animatedDrawableFactory == null) {
-        bitmapFactory
-      } else {
-        if (animatedDrawableFactory is ImageOptionsDrawableFactory) {
-          ArrayVitoDrawableFactory(bitmapFactory, animatedDrawableFactory)
-        } else {
-          ArrayVitoDrawableFactory(bitmapFactory, DrawableFactoryWrapper(animatedDrawableFactory))
-        }
+      val xmlFactory =
+          ImagePipelineFactory.getInstance().xmlDrawableFactory?.let(DrawableFactoryWrapper::wrap)
+      val factories = listOfNotNull(bitmapFactory, animatedDrawableFactory, xmlFactory)
+      return when (factories.size) {
+        1 -> factories[0]
+        else -> ArrayVitoDrawableFactory(*factories.toTypedArray())
       }
     }
   }

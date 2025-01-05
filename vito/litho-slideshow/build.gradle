@@ -6,11 +6,16 @@
  */
 
 import com.facebook.fresco.buildsrc.Deps
+import com.facebook.fresco.buildsrc.GradleDeps
 import com.facebook.fresco.buildsrc.TestDeps
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
+
+kotlin {
+    jvmToolchain(11)
+}
 
 dependencies {
     compileOnly Deps.inferAnnotation
@@ -35,8 +40,12 @@ dependencies {
 }
 
 android {
+    ndkVersion GradleDeps.Native.version
+
     buildToolsVersion FrescoConfig.buildToolsVersion
     compileSdkVersion FrescoConfig.compileSdkVersion
+
+    namespace "com.facebook.fresco.vito.litho.slideshow"
 
     defaultConfig {
         minSdkVersion FrescoConfig.vitoLithoMinSdkVersion

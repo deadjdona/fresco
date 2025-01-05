@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
  * Map-like datastructure that allows to have more than one value per int key. Allows to remove a
  * value from LRU key by calling {@link #removeFromEnd()}
  */
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 @ThreadSafe
 public class BucketMap<T> {
   protected final SparseArray<LinkedEntry<T>> mMap = new SparseArray<>();
@@ -84,7 +84,9 @@ public class BucketMap<T> {
     moveToFront(bucket);
   }
 
-  /** @return number of objects contained in the {@link BucketMap} */
+  /**
+   * @return number of objects contained in the {@link BucketMap}
+   */
   @VisibleForTesting
   synchronized int valueCount() {
     int count = 0;

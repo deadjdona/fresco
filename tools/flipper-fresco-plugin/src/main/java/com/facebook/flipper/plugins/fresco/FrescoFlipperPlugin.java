@@ -49,6 +49,7 @@ import com.facebook.imagepipeline.image.CloseableBitmap;
 import com.facebook.imagepipeline.image.CloseableImage;
 import com.facebook.imagepipeline.image.EncodedImage;
 import com.facebook.imageutils.BitmapUtil;
+import com.facebook.infer.annotation.Nullsafe;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -64,6 +65,7 @@ import javax.annotation.Nullable;
  * Allows Sonar to display the contents of Fresco's caches. This is useful for developers to debug
  * what images are being held in cache as they navigate through their app.
  */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class FrescoFlipperPlugin extends BufferingFlipperPlugin
     implements ImagePerfDataListener, CloseableReferenceLeakTracker.Listener {
 
@@ -89,7 +91,7 @@ public class FrescoFlipperPlugin extends BufferingFlipperPlugin
   private final FlipperImageTracker mFlipperImageTracker;
   private final PlatformBitmapFactory mPlatformBitmapFactory;
   @Nullable private final FlipperObjectHelper mSonarObjectHelper;
-  private final DebugMemoryManager mMemoryManager;
+  @Nullable private final DebugMemoryManager mMemoryManager;
   private final FlipperPerfLogger mPerfLogger;
   @Nullable private final FrescoFlipperDebugPrefHelper mDebugPrefHelper;
   private final List<FlipperObject> mEvents = new ArrayList<>();
@@ -284,6 +286,8 @@ public class FrescoFlipperPlugin extends BufferingFlipperPlugin
               final String imageId, final CacheKey cacheKey, final FlipperResponder responder) {
             Task<EncodedImage> t =
                 Fresco.getImagePipelineFactory()
+                    .getDiskCachesStoreSupplier()
+                    .get()
                     .getMainBufferedDiskCache()
                     .get(cacheKey, new AtomicBoolean(false));
 
@@ -410,7 +414,12 @@ public class FrescoFlipperPlugin extends BufferingFlipperPlugin
       levelsBuilder.put(
           getDiskStats(
               "Disk images",
-              Fresco.getImagePipelineFactory().getMainFileCache().getDumpInfo().entries));
+              Fresco.getImagePipelineFactory()
+                  .getDiskCachesStoreSupplier()
+                  .get()
+                  .getMainFileCache()
+                  .getDumpInfo()
+                  .entries));
     }
 
     return new FlipperObject.Builder().put("levels", levelsBuilder.build()).build();
@@ -441,7 +450,13 @@ public class FrescoFlipperPlugin extends BufferingFlipperPlugin
     return new FlipperObject.Builder()
         .put("cacheType", cacheType)
         .put("clearKey", "disk")
-        .put("sizeBytes", Fresco.getImagePipelineFactory().getMainFileCache().getSize())
+        .put(
+            "sizeBytes",
+            Fresco.getImagePipelineFactory()
+                .getDiskCachesStoreSupplier()
+                .get()
+                .getMainFileCache()
+                .getSize())
         .put("imageIds", buildImageIdListDisk(diskEntries))
         .build();
   }

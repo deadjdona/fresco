@@ -6,14 +6,19 @@
  */
 
 import com.facebook.fresco.buildsrc.Deps
+import com.facebook.fresco.buildsrc.GradleDeps
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 
 android {
+    ndkVersion GradleDeps.Native.version
+
     buildToolsVersion FrescoConfig.buildToolsVersion
     compileSdkVersion FrescoConfig.compileSdkVersion
+
+    namespace "com.facebook.flipper.plugins.fresco"
 
     defaultConfig {
         minSdkVersion FrescoConfig.flipperPluginMinSdkVersion
@@ -26,6 +31,7 @@ android {
         implementation project(':middleware')
         implementation project(':tools:flipper')
         implementation project(':ui-common')
+        implementation Deps.inferAnnotation
         implementation Deps.Tools.Flipper.flipper
         compileOnly Deps.jsr305
 

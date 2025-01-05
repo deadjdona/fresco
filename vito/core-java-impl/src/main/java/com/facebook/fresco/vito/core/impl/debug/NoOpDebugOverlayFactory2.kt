@@ -11,7 +11,5 @@ import com.facebook.fresco.ui.common.ControllerListener2.Extras
 import com.facebook.fresco.vito.core.impl.FrescoDrawable2
 
 class NoOpDebugOverlayFactory2 : DebugOverlayFactory2 {
-  override fun update(drawable: FrescoDrawable2, extras: Extras?) {
-    // no-op
-  }
+  override fun update(drawable: FrescoDrawable2, extras: Extras?): Unit = Unit // no-op
 }

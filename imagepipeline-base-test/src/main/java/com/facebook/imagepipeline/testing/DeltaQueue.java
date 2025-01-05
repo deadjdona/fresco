@@ -7,12 +7,16 @@
 
 package com.facebook.imagepipeline.testing;
 
+import com.facebook.infer.annotation.Nullsafe;
+import javax.annotation.Nullable;
+
 /**
  * A queue of nodes sorted by timestamp for the purpose of implementing a scheduled executor. Used
  * for {@link ScheduledQueue}.
  *
  * @param <T> the type of node
  */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class DeltaQueue<T> {
   /**
    * A node in the queue.
@@ -22,7 +26,7 @@ public class DeltaQueue<T> {
   private static class Node<T> {
     public final T value;
     public long delay;
-    public Node<T> next = null;
+    @Nullable public Node<T> next = null;
 
     public Node(T value, long nanos) {
       this.value = value;
@@ -30,7 +34,7 @@ public class DeltaQueue<T> {
     }
   }
 
-  private Node<T> head = null;
+  @Nullable private Node<T> head = null;
   private int size;
 
   /**
@@ -57,6 +61,7 @@ public class DeltaQueue<T> {
    * @return the next item in the queue
    */
   public T next() {
+    // NULLSAFE_FIXME[Nullable Dereference]
     return head.value;
   }
 
@@ -66,6 +71,7 @@ public class DeltaQueue<T> {
    * @return the delay until the next item
    */
   public long delay() {
+    // NULLSAFE_FIXME[Nullable Dereference]
     return head.delay;
   }
 
@@ -127,11 +133,14 @@ public class DeltaQueue<T> {
    * @return the next element off the queue.
    */
   public T pop() {
+    // NULLSAFE_FIXME[Nullable Dereference]
     if (head.delay > 0) {
       throw new IllegalStateException("cannot pop the head element when it has a non-zero delay");
     }
 
+    // NULLSAFE_FIXME[Nullable Dereference]
     T popped = head.value;
+    // NULLSAFE_FIXME[Nullable Dereference]
     head = head.next;
     size--;
     return popped;

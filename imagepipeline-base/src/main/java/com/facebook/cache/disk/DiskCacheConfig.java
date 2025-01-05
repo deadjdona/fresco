@@ -24,7 +24,7 @@ import java.io.File;
 import javax.annotation.Nullable;
 
 /** Configuration class for a {@link DiskStorageCache}. */
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class DiskCacheConfig {
 
   private final int mVersion;
@@ -35,7 +35,7 @@ public class DiskCacheConfig {
   private final long mMinimumSizeLimit;
   private final EntryEvictionComparatorSupplier mEntryEvictionComparatorSupplier;
   private final CacheErrorLogger mCacheErrorLogger;
-  private final CacheEventListener mCacheEventListener;
+  @Nullable private final CacheEventListener mCacheEventListener;
   private final DiskTrimmableRegistry mDiskTrimmableRegistry;
   @Nullable private final Context mContext;
   private final boolean mIndexPopulateAtStartupEnabled;
@@ -110,7 +110,7 @@ public class DiskCacheConfig {
     return mCacheErrorLogger;
   }
 
-  public CacheEventListener getCacheEventListener() {
+  public @Nullable CacheEventListener getCacheEventListener() {
     return mCacheEventListener;
   }
 
@@ -139,7 +139,7 @@ public class DiskCacheConfig {
     return new Builder(context);
   }
 
-  public static class Builder {
+  public static final class Builder {
 
     private int mVersion = 1;
     private String mBaseDirectoryName = "image_cache";

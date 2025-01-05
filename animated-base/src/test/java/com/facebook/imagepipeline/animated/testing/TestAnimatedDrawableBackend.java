@@ -14,8 +14,11 @@ import com.facebook.common.references.CloseableReference;
 import com.facebook.imagepipeline.animated.base.AnimatedDrawableBackend;
 import com.facebook.imagepipeline.animated.base.AnimatedDrawableFrameInfo;
 import com.facebook.imagepipeline.animated.base.AnimatedImageResult;
+import com.facebook.infer.annotation.Nullsafe;
+import javax.annotation.Nullable;
 
 /** Implementation of {@link AnimatedDrawableBackend} for unit tests. */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class TestAnimatedDrawableBackend implements AnimatedDrawableBackend {
 
   private final int mWidth;
@@ -43,6 +46,7 @@ public class TestAnimatedDrawableBackend implements AnimatedDrawableBackend {
 
   @Override
   public AnimatedImageResult getAnimatedImageResult() {
+    // NULLSAFE_FIXME[Return Not Nullable]
     return null;
   }
 
@@ -139,7 +143,7 @@ public class TestAnimatedDrawableBackend implements AnimatedDrawableBackend {
   }
 
   @Override
-  public AnimatedDrawableBackend forNewBounds(Rect bounds) {
+  public AnimatedDrawableBackend forNewBounds(@Nullable Rect bounds) {
     return this;
   }
 
@@ -150,6 +154,7 @@ public class TestAnimatedDrawableBackend implements AnimatedDrawableBackend {
 
   @Override
   public CloseableReference<Bitmap> getPreDecodedFrame(int frameNumber) {
+    // NULLSAFE_FIXME[Return Not Nullable]
     return null;
   }
 

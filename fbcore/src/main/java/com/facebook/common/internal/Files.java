@@ -31,7 +31,7 @@ import java.io.InputStream;
  * @author Colin Decker
  * @since 1.0
  */
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class Files {
   private Files() {}
 
@@ -52,6 +52,7 @@ public class Files {
         ? ByteStreams.toByteArray(in)
         : ByteStreams.toByteArray(in, (int) expectedSize);
   }
+
   /**
    * Reads all bytes from a file into a byte array.
    *

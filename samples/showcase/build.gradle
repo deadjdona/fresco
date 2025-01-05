@@ -6,6 +6,7 @@
  */
 
 import com.facebook.fresco.buildsrc.Deps
+import com.facebook.fresco.buildsrc.GradleDeps
 import com.facebook.fresco.buildsrc.SampleDeps
 import com.facebook.fresco.buildsrc.TestDeps
 
@@ -13,14 +14,17 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 
+kotlin {
+    jvmToolchain(11)
+}
+
 android {
+    ndkVersion GradleDeps.Native.version
+
     buildToolsVersion FrescoConfig.buildToolsVersion
     compileSdkVersion FrescoConfig.compileSdkVersion
 
-    dexOptions {
-        maxProcessCount 2
-        javaMaxHeapSize "1g"
-    }
+    namespace "com.facebook.fresco.samples.showcase"
 
     defaultConfig {
         applicationId "com.facebook.fresco.samples.showcase"
@@ -86,6 +90,7 @@ android {
 
     buildFeatures {
         viewBinding true
+        buildConfig = true
     }
 }
 
@@ -161,6 +166,7 @@ dependencies {
     implementation(Deps.Tools.Flipper.flipper)
 
     implementation project(':tools:flipper')
+    implementation Deps.SoLoader.soloader
 
     implementation Deps.Kotlin.stdlibJdk
 

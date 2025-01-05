@@ -9,12 +9,14 @@ package com.facebook.fresco.vito.core
 
 import android.content.res.Resources
 import android.graphics.Rect
+import com.facebook.common.callercontext.ContextChain
 import com.facebook.common.references.CloseableReference
 import com.facebook.datasource.DataSource
 import com.facebook.fresco.vito.options.ImageOptions
 import com.facebook.fresco.vito.source.ImageSource
 import com.facebook.imagepipeline.image.CloseableImage
 import com.facebook.imagepipeline.listener.RequestListener
+import java.util.concurrent.TimeUnit
 
 interface VitoImagePipeline {
 
@@ -32,6 +34,10 @@ interface VitoImagePipeline {
       options: ImageOptions?,
       logWithHighSamplingRate: Boolean = false,
       viewport: Rect? = null,
+      callerContext: Any? = null,
+      contextChain: ContextChain? = null,
+      forceKeepOriginalSize: Boolean = false,
+      forLoggingOnly: Boolean = false,
   ): VitoImageRequest
 
   fun getCachedImage(imageRequest: VitoImageRequest): CloseableReference<CloseableImage>?
@@ -42,4 +48,23 @@ interface VitoImagePipeline {
       requestListener: RequestListener?,
       uiComponentId: Long
   ): DataSource<CloseableReference<CloseableImage>>
+
+  fun isInDiskCacheSync(
+      imageRequest: VitoImageRequest,
+  ): Boolean
+
+  fun isInDiskCacheSync(
+      imageRequest: VitoImageRequest,
+      timeout: Long,
+      unit: TimeUnit,
+  ): Boolean? {
+    throw UnsupportedOperationException("Not implemented yet")
+  }
+
+  /** Remove an image from all disk & memory caches. */
+  fun evictFromCaches(imageRequest: VitoImageRequest) {
+    throw UnsupportedOperationException("Method not implemented: evictFromCaches")
+  }
+
+  fun hintUnmodifiedUri(imageRequest: VitoImageRequest) = Unit
 }

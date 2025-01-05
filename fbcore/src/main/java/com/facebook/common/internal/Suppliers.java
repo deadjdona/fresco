@@ -10,7 +10,7 @@ package com.facebook.common.internal;
 import com.facebook.infer.annotation.Nullsafe;
 
 /** Wrapper for creating a Supplier and default Suppliers for convenience. */
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class Suppliers {
   /**
    * Returns a Supplier which always returns {@code instance}.
@@ -41,6 +41,15 @@ public class Suppliers {
         @Override
         public Boolean get() {
           return false;
+        }
+      };
+
+  /** String supplier that always returns empty string. */
+  public static final Supplier<String> STRING_EMPTY =
+      new Supplier<String>() {
+        @Override
+        public String get() {
+          return "";
         }
       };
 }

@@ -8,9 +8,12 @@
 package com.facebook.imagepipeline.image;
 
 import com.facebook.common.logging.FLog;
+import com.facebook.infer.annotation.Nullsafe;
 
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public abstract class DefaultCloseableImage extends BaseCloseableImage {
   private static final String TAG = "CloseableImage";
+
   /** Ensures that the underlying resources are always properly released. */
   @Override
   protected void finalize() throws Throwable {

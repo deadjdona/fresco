@@ -51,6 +51,34 @@ public class ImageRequestTest {
   }
 
   @Test
+  public void testCreatingRequestWithDynamicCacheChoice_success() {
+    ImageRequest request =
+        ImageRequestBuilder.newBuilderWithSource(Uri.parse("http://frescolib.org/image.jpg"))
+            .setCacheChoice(ImageRequest.CacheChoice.DYNAMIC)
+            .setDiskCacheId("dynamic_cache_id")
+            .setImageDecodeOptions(new ImageDecodeOptionsBuilder().build())
+            .setLocalThumbnailPreviewsEnabled(true)
+            .setLowestPermittedRequestLevel(ImageRequest.RequestLevel.DISK_CACHE)
+            .setPostprocessor(
+                new BasePostprocessor() {
+                  @Override
+                  public String getName() {
+                    return super.getName();
+                  }
+                })
+            .setProgressiveRenderingEnabled(true)
+            .setRequestListener(new RequestLoggingListener())
+            .setResizeOptions(new ResizeOptions(20, 20))
+            .setRotationOptions(RotationOptions.forceRotation(RotationOptions.ROTATE_90))
+            .setRequestPriority(Priority.HIGH)
+            .build();
+
+    assertThat(request).isNotNull();
+    assertThat(request.getCacheChoice()).isEqualTo(ImageRequest.CacheChoice.DYNAMIC);
+    assertThat(request.getDiskCacheId()).isEqualTo("dynamic_cache_id");
+  }
+
+  @Test
   public void testImageRequestForLocalFile_normal() {
     final File file = new File("/foo/photos/penguin.jpg");
     final ImageRequest imageRequest = ImageRequest.fromFile(file);

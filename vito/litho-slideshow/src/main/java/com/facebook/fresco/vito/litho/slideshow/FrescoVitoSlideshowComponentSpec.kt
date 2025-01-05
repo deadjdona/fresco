@@ -54,9 +54,9 @@ object FrescoVitoSlideshowComponentSpec {
   @OnCreateMountContent
   fun onCreateMountContent(c: Context?): FrescoVitoSlideshowDrawable<*> =
       FrescoVitoSlideshowDrawable(
-          FrescoVitoProvider.getController().createDrawable(),
-          FrescoVitoProvider.getController().createDrawable(),
-          FrescoVitoProvider.getController().createDrawable())
+          FrescoVitoProvider.getController().createDrawable("litho"),
+          FrescoVitoProvider.getController().createDrawable("litho"),
+          FrescoVitoProvider.getController().createDrawable("litho"))
 
   @JvmStatic
   @OnMount
@@ -66,6 +66,7 @@ object FrescoVitoSlideshowComponentSpec {
       @Prop(varArg = "uri") uris: List<Uri?>,
       @Prop photoTransitionMs: Int,
       @Prop fadeTransitionMs: Int,
+      @Prop(optional = true) heroMediaTransitionMs: Int?,
       @Prop(optional = true) isPlaying: Boolean,
       @Prop(optional = true) imageOptions: ImageOptions?,
       @Prop(optional = true) callerContext: Any?,
@@ -89,7 +90,7 @@ object FrescoVitoSlideshowComponentSpec {
     fetchNextImage(
         c.resources,
         slideshowDrawable,
-        uris[slideshowIndex],
+        uris[slideshowIndex % uris.size],
         imageOptions,
         callerContext,
         contextChain,
@@ -110,12 +111,26 @@ object FrescoVitoSlideshowComponentSpec {
           contextChain,
           imageListener)
 
+      var delayAttempt = 0
+      val maxDelayAttempts =
+          if (heroMediaTransitionMs !== null)
+              heroMediaTransitionMs.div(photoTransitionMs + fadeTransitionMs)
+          else 0
       // Set up task for animating to next image
       val animation: Runnable =
           object : Runnable {
             var currentIndex = nextImageIndex
 
             override fun run() {
+              if (heroMediaTransitionMs !== null) {
+                if (currentIndex == 1 && delayAttempt < maxDelayAttempts) {
+                  delayAttempt++
+                  return
+                } else {
+                  delayAttempt = 0
+                }
+              }
+
               val nextIndex = (currentIndex + 1) % listSize
               animateToNextImage(
                   c.resources,
@@ -179,7 +194,7 @@ object FrescoVitoSlideshowComponentSpec {
     fetchNextImage(
         resources,
         slideshowDrawable,
-        uris[nextIndex],
+        uris[nextIndex % uris.size],
         options,
         callerContext,
         contextChain,
@@ -200,10 +215,14 @@ object FrescoVitoSlideshowComponentSpec {
   ) {
     FrescoVitoProvider.getController()
         .fetch(
-            frescoDrawable = slideshowDrawable.nextImage,
+            drawable = slideshowDrawable.nextImage,
             imageRequest =
                 FrescoVitoProvider.getImagePipeline()
-                    .createImageRequest(resources, ImageSourceProvider.forUri(uri), options),
+                    .createImageRequest(
+                        resources,
+                        ImageSourceProvider.forUri(uri),
+                        options,
+                        callerContext = callerContext),
             callerContext = callerContext,
             contextChain = contextChain,
             listener = listener,

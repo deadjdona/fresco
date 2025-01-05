@@ -7,8 +7,10 @@
 
 package com.facebook.fresco.vito.core.impl
 
+import android.graphics.Matrix
 import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import com.facebook.drawee.components.DeferredReleaser.Releasable
@@ -44,6 +46,7 @@ abstract class FrescoDrawable2 :
   fun setProgressDrawable(drawable: Drawable?): Drawable? =
       setDrawable(PROGRESS_DRAWABLE_INDEX, drawable)
 
+  @Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
   fun setProgress(progress: Float) {
     val progressBarDrawable = getDrawable(PROGRESS_DRAWABLE_INDEX) ?: return
     // display progressbar when not fully loaded, hide otherwise
@@ -82,7 +85,7 @@ abstract class FrescoDrawable2 :
 
   override fun close() {
     maybeStopAnimation(getDrawable(PLACEHOLDER_DRAWABLE_INDEX))
-    for (i in 0 until LAYER_COUNT) {
+    for (i in LAYER_RANGE) {
       setDrawable(i, null)
     }
   }
@@ -122,25 +125,33 @@ abstract class FrescoDrawable2 :
 
   abstract fun cancelReleaseNextFrame()
 
+  override fun getActualImageBounds(outBounds: RectF) {
+    val transform = Matrix()
+    // actualImageWrapper is the scale type Drawable, so we retrieve the current transform matrix
+    actualImageWrapper?.getTransform(transform)
+    // We store the actual image bounds (if present) in outBounds.
+    // IMPORTANT: {@code getBounds} should be called after {@code getTransform},
+    // because the parent may have to change our bounds.
+    outBounds.set(actualImageWrapper?.drawable?.bounds ?: return)
+    // We map the actual image bounds according to the current transform matrix
+    transform.mapRect(outBounds)
+  }
+
   companion object {
+    const val IMAGE_DRAWABLE_INDEX: Int = 1
+
     private const val LAYER_COUNT = 4
     private const val PLACEHOLDER_DRAWABLE_INDEX = 0
-    const val IMAGE_DRAWABLE_INDEX = 1
     private const val PROGRESS_DRAWABLE_INDEX = 2
     private const val OVERLAY_DRAWABLE_INDEX = 3
+    private val LAYER_RANGE = 0 until LAYER_COUNT
 
     private fun maybeStopAnimation(drawable: Drawable?) {
-      if (drawable is Animatable) {
-        (drawable as Animatable).stop()
-      }
+      (drawable as? Animatable)?.stop()
     }
 
     private fun maybeStartAnimation(drawable: Drawable?) {
-      if (drawable is Animatable) {
-        (drawable as Animatable).start()
-      }
+      (drawable as? Animatable)?.start()
     }
   }
-
-  abstract fun setIntrinsicSize(width: Int, height: Int)
 }

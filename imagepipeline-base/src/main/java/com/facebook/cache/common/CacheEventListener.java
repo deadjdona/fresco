@@ -15,7 +15,7 @@ import com.facebook.infer.annotation.Nullsafe;
  * <p>In all callback methods, the {@link CacheEvent} object should not be held beyond the method
  * itself as they may be automatically recycled.
  */
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public interface CacheEventListener {
 
   /** Triggered by a cache hit. */
@@ -52,6 +52,7 @@ public interface CacheEventListener {
     CACHE_FULL,
     CONTENT_STALE,
     USER_FORCED,
-    CACHE_MANAGER_TRIMMED
+    CACHE_MANAGER_TRIMMED,
+    TRIM_EXPIRED,
   }
 }

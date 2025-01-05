@@ -7,15 +7,16 @@
 
 package com.facebook.fresco.vito.view.impl
 
+import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.view.View
 import android.view.View.OnAttachStateChangeListener
 import android.widget.ImageView
-import androidx.core.view.ViewCompat
 import com.facebook.common.internal.Supplier
 import com.facebook.common.internal.Suppliers
 import com.facebook.drawee.drawable.VisibilityCallback
+import com.facebook.fresco.ui.common.OnFadeListener
 import com.facebook.fresco.vito.core.FrescoDrawableInterface
 import com.facebook.fresco.vito.core.VitoImageRequest
 import com.facebook.fresco.vito.core.VitoImageRequestListener
@@ -54,32 +55,46 @@ object VitoViewImpl2 {
       }
 
   @JvmStatic
+  @JvmOverloads
   fun show(
       imageSource: ImageSource,
       imageOptions: ImageOptions,
       callerContext: Any?,
       imageListener: ImageListener?,
       imageRequestListener: VitoImageRequestListener?,
-      target: View
+      target: View,
+      onFadeListener: OnFadeListener? = null,
+      uiFramework: String = "view",
   ) {
     show(
         FrescoVitoProvider.getImagePipeline()
-            .createImageRequest(target.resources, imageSource, imageOptions),
+            .createImageRequest(
+                target.resources,
+                imageSource,
+                imageOptions,
+                viewport = Rect(0, 0, target.width, target.height),
+                callerContext = callerContext,
+                forceKeepOriginalSize = false),
         callerContext,
         imageListener,
         imageRequestListener,
-        target)
+        target,
+        onFadeListener,
+        uiFramework)
   }
 
   @JvmStatic
+  @JvmOverloads
   fun show(
       imageRequest: VitoImageRequest,
       callerContext: Any?,
       imageListener: ImageListener?,
       imageRequestListener: VitoImageRequestListener?,
-      target: View
+      target: View,
+      onFadeListener: OnFadeListener? = null,
+      uiFramework: String = "view",
   ) {
-    val frescoDrawable = ensureDrawableSet(target)
+    val frescoDrawable = ensureDrawableSet(target, uiFramework)
     // The Drawable might be re-purposed before being cleaned up, so we release if necessary.
     val oldImageRequest = frescoDrawable.imageRequest
     if (oldImageRequest != null && oldImageRequest != imageRequest) {
@@ -88,14 +103,14 @@ object VitoViewImpl2 {
     frescoDrawable.refetchRunnable = Runnable {
       FrescoVitoProvider.getController()
           .fetch(
-              frescoDrawable = frescoDrawable,
+              drawable = frescoDrawable,
               imageRequest = imageRequest,
               callerContext = callerContext,
               contextChain = null,
               listener = imageListener,
               perfDataListener = null,
-              onFadeListener = null,
-              viewportDimensions = null,
+              onFadeListener = onFadeListener,
+              viewportDimensions = Rect(0, 0, target.width, target.height),
               vitoImageRequestListener = imageRequestListener)
     }
     if (useSimpleFetchLogic.get()) {
@@ -141,26 +156,26 @@ object VitoViewImpl2 {
    * @param target the target to use
    * @return The drawable to use for the given target
    */
-  private fun ensureDrawableSet(target: View): FrescoDrawableInterface {
+  private fun ensureDrawableSet(target: View, uiFramework: String): FrescoDrawableInterface {
     return when (target) {
       is ImageView ->
           when (val current = target.drawable) {
             is FrescoDrawableInterface -> current
             else ->
-                createDrawable().also {
+                createDrawable(uiFramework).also { image ->
                   // Force the Drawable to adjust its bounds to match the hosting ImageView's
                   // bounds, since Fresco has custom scale types that are separate from ImageView's
                   // scale type.
                   // Without this, the Drawable would not respect the given Fresco ScaleType,
                   // effectively resulting in CENTER_INSIDE.
                   target.scaleType = ImageView.ScaleType.FIT_XY
-                  target.setImageDrawable(it as Drawable)
+                  target.setImageDrawable(image as Drawable)
                 }
           }
       else ->
           when (val current = target.background) {
             is FrescoDrawableInterface -> current
-            else -> createDrawable().also { ViewCompat.setBackground(target, it as Drawable) }
+            else -> createDrawable(uiFramework).also { target.setBackground(it as Drawable) }
           }
     }
   }
@@ -169,9 +184,9 @@ object VitoViewImpl2 {
     return (if (view is ImageView) view.drawable else view.background) as? FrescoDrawableInterface
   }
 
-  private fun createDrawable(): FrescoDrawableInterface {
+  private fun createDrawable(uiFramework: String): FrescoDrawableInterface {
     val frescoDrawable: FrescoDrawableInterface =
-        FrescoVitoProvider.getController().createDrawable()
+        FrescoVitoProvider.getController().createDrawable(uiFramework)
     if (useVisibilityCallbacks.get()) {
       frescoDrawable.setVisibilityCallback(
           object : VisibilityCallback {

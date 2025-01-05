@@ -19,7 +19,6 @@ import com.facebook.common.memory.PooledByteStreams
 import com.facebook.common.webp.WebpBitmapFactory
 import com.facebook.common.webp.WebpBitmapFactory.WebpErrorLogger
 import com.facebook.imagepipeline.bitmaps.PlatformBitmapFactory
-import com.facebook.imagepipeline.cache.BufferedDiskCache
 import com.facebook.imagepipeline.cache.CacheKeyFactory
 import com.facebook.imagepipeline.cache.MemoryCache
 import com.facebook.imagepipeline.decoder.ImageDecoder
@@ -44,10 +43,11 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
   val useDownsamplingRatioForResizing: Boolean
   val useBitmapPrepareToDraw: Boolean
   val useBalancedAnimationStrategy: Boolean
+  val animationStrategyBufferLengthMilliseconds: Int
   val bitmapPrepareToDrawMinSizeBytes: Int
   val bitmapPrepareToDrawMaxSizeBytes: Int
   val bitmapPrepareToDrawForPrefetch: Boolean
-  val maxBitmapSize: Int
+  val maxBitmapDimension: Int
   val isNativeCodeDisabled: Boolean
   val isPartialImageCachingEnabled: Boolean
   val producerFactoryMethod: ProducerFactoryMethod
@@ -74,6 +74,7 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
   val animationRenderFpsLimit: Int
   val prefetchShortcutEnabled: Boolean
   val platformDecoderOptions: PlatformDecoderOptions
+  val isBinaryXmlEnabled: Boolean
 
   class Builder(private val configBuilder: ImagePipelineConfig.Builder) {
     @JvmField var shouldUseDecodingBufferHelper = false
@@ -84,11 +85,12 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
     @JvmField var useDownsamplingRatioForResizing = false
     @JvmField var useBitmapPrepareToDraw = false
     @JvmField var useBalancedAnimationStrategy = false
+    @JvmField var animationStrategyBufferLengthMilliseconds = 1000
     @JvmField var bitmapPrepareToDrawMinSizeBytes = 0
     @JvmField var bitmapPrepareToDrawMaxSizeBytes = 0
 
     @JvmField var bitmapPrepareToDrawForPrefetch = false
-    @JvmField var maxBitmapSize = BitmapUtil.MAX_BITMAP_SIZE.toInt()
+    @JvmField var maxBitmapDimension = BitmapUtil.MAX_BITMAP_DIMENSION.toInt()
     @JvmField var nativeCodeDisabled = false
     @JvmField var isPartialImageCachingEnabled = false
     @JvmField var producerFactoryMethod: ProducerFactoryMethod? = null
@@ -125,6 +127,8 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
     @JvmField var prefetchShortcutEnabled = false
 
     @JvmField var platformDecoderOptions = PlatformDecoderOptions()
+
+    @JvmField var isBinaryXmlEnabled = false
 
     private fun asBuilder(block: () -> Unit): Builder {
       block()
@@ -218,10 +222,19 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
       this.useBalancedAnimationStrategy = useBalancedAnimationStrategy
     }
 
+    /** The balanced animation strategy buffer length for single animation */
+    fun setAnimationStrategyBufferLengthMilliseconds(
+        animationStrategyBufferLengthMilliseconds: Int
+    ) = asBuilder {
+      this.animationStrategyBufferLengthMilliseconds = animationStrategyBufferLengthMilliseconds
+    }
+
     /**
      * Sets the maximum bitmap size use to compute the downsampling value when decoding Jpeg images.
      */
-    fun setMaxBitmapSize(maxBitmapSize: Int) = asBuilder { this.maxBitmapSize = maxBitmapSize }
+    fun setMaxBitmapDimension(maxBitmapDimension: Int) = asBuilder {
+      this.maxBitmapDimension = maxBitmapDimension
+    }
 
     /**
      * If true, the pipeline will use alternative implementations without native code.
@@ -314,6 +327,10 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
       this.platformDecoderOptions = platformDecoderOptions
     }
 
+    fun setBinaryXmlEnabled(binaryXmlEnabled: Boolean) = asBuilder {
+      isBinaryXmlEnabled = binaryXmlEnabled
+    }
+
     fun build(): ImagePipelineExperiments = ImagePipelineExperiments(this)
   }
 
@@ -323,7 +340,7 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         byteArrayPool: ByteArrayPool,
         imageDecoder: ImageDecoder,
         progressiveJpegConfig: ProgressiveJpegConfig,
-        downsampleEnabled: Boolean,
+        downsampleMode: DownsampleMode,
         resizeAndRotateEnabledForNetwork: Boolean,
         decodeCancellationEnabled: Boolean,
         executorSupplier: ExecutorSupplier,
@@ -331,8 +348,7 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         pooledByteStreams: PooledByteStreams,
         bitmapMemoryCache: MemoryCache<CacheKey?, CloseableImage?>,
         encodedMemoryCache: MemoryCache<CacheKey?, PooledByteBuffer?>,
-        defaultBufferedDiskCache: BufferedDiskCache,
-        smallImageBufferedDiskCache: BufferedDiskCache,
+        diskCachesStoreSupplier: Supplier<DiskCachesStore>,
         cacheKeyFactory: CacheKeyFactory,
         platformBitmapFactory: PlatformBitmapFactory,
         bitmapPrepareToDrawMinSizeBytes: Int,
@@ -351,7 +367,7 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         byteArrayPool: ByteArrayPool,
         imageDecoder: ImageDecoder,
         progressiveJpegConfig: ProgressiveJpegConfig,
-        downsampleEnabled: Boolean,
+        downsampleMode: DownsampleMode,
         resizeAndRotateEnabledForNetwork: Boolean,
         decodeCancellationEnabled: Boolean,
         executorSupplier: ExecutorSupplier,
@@ -359,8 +375,7 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         pooledByteStreams: PooledByteStreams,
         bitmapMemoryCache: MemoryCache<CacheKey?, CloseableImage?>,
         encodedMemoryCache: MemoryCache<CacheKey?, PooledByteBuffer?>,
-        defaultBufferedDiskCache: BufferedDiskCache,
-        smallImageBufferedDiskCache: BufferedDiskCache,
+        diskCachesStoreSupplier: Supplier<DiskCachesStore>,
         cacheKeyFactory: CacheKeyFactory,
         platformBitmapFactory: PlatformBitmapFactory,
         bitmapPrepareToDrawMinSizeBytes: Int,
@@ -376,15 +391,14 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
             byteArrayPool!!,
             imageDecoder!!,
             progressiveJpegConfig!!,
-            downsampleEnabled,
+            downsampleMode,
             resizeAndRotateEnabledForNetwork,
             decodeCancellationEnabled,
             executorSupplier!!,
             pooledByteBufferFactory!!,
             bitmapMemoryCache!!,
             encodedMemoryCache!!,
-            defaultBufferedDiskCache!!,
-            smallImageBufferedDiskCache!!,
+            diskCachesStoreSupplier,
             cacheKeyFactory!!,
             platformBitmapFactory!!,
             bitmapPrepareToDrawMinSizeBytes,
@@ -404,10 +418,11 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
     useDownsamplingRatioForResizing = builder.useDownsamplingRatioForResizing
     useBitmapPrepareToDraw = builder.useBitmapPrepareToDraw
     useBalancedAnimationStrategy = builder.useBalancedAnimationStrategy
+    animationStrategyBufferLengthMilliseconds = builder.animationStrategyBufferLengthMilliseconds
     bitmapPrepareToDrawMinSizeBytes = builder.bitmapPrepareToDrawMinSizeBytes
     bitmapPrepareToDrawMaxSizeBytes = builder.bitmapPrepareToDrawMaxSizeBytes
     bitmapPrepareToDrawForPrefetch = builder.bitmapPrepareToDrawForPrefetch
-    maxBitmapSize = builder.maxBitmapSize
+    maxBitmapDimension = builder.maxBitmapDimension
     isNativeCodeDisabled = builder.nativeCodeDisabled
     isPartialImageCachingEnabled = builder.isPartialImageCachingEnabled
     producerFactoryMethod = builder.producerFactoryMethod ?: DefaultProducerFactoryMethod()
@@ -434,6 +449,7 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
     cancelDecodeOnCacheMiss = builder.cancelDecodeOnCacheMiss
     prefetchShortcutEnabled = builder.prefetchShortcutEnabled
     platformDecoderOptions = builder.platformDecoderOptions
+    isBinaryXmlEnabled = builder.isBinaryXmlEnabled
   }
 
   companion object {

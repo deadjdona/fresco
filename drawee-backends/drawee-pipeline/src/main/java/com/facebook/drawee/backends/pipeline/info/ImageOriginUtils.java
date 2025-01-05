@@ -24,7 +24,7 @@ import com.facebook.imagepipeline.producers.PostprocessedBitmapMemoryCacheProduc
 import com.facebook.imagepipeline.producers.QualifiedResourceFetchProducer;
 import com.facebook.infer.annotation.Nullsafe;
 
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class ImageOriginUtils {
 
   public static String toString(@ImageOrigin int imageOrigin) {
@@ -42,7 +42,7 @@ public class ImageOriginUtils {
       case ImageOrigin.LOCAL:
         return "local";
       case ImageOrigin.UNKNOWN:
-        // fall through
+      // fall through
       default:
         return "unknown";
     }

@@ -19,6 +19,7 @@ import com.facebook.imagepipeline.common.ImageDecodeOptions;
 import com.facebook.imagepipeline.common.Priority;
 import com.facebook.imagepipeline.common.ResizeOptions;
 import com.facebook.imagepipeline.common.RotationOptions;
+import com.facebook.imagepipeline.core.DownsampleMode;
 import com.facebook.imagepipeline.core.ImagePipelineConfig;
 import com.facebook.imagepipeline.core.ImagePipelineExperiments;
 import com.facebook.imagepipeline.listener.RequestListener;
@@ -47,7 +48,9 @@ public class ImageRequestBuilder {
   private @Nullable RequestListener mRequestListener;
   private @Nullable BytesRange mBytesRange = null;
   private @Nullable Boolean mResizingAllowedOverride = null;
+  private @Nullable DownsampleMode mDownsampleOverride = null;
   private int mDelayMs;
+  private @Nullable String mDiskCacheId = null;
 
   /**
    * Creates a new request builder instance. The setting will be done according to the source type.
@@ -102,7 +105,10 @@ public class ImageRequestBuilder {
         .setRequestListener(imageRequest.getRequestListener())
         .setRotationOptions(imageRequest.getRotationOptions())
         .setShouldDecodePrefetches(imageRequest.shouldDecodePrefetches())
-        .setDelayMs(imageRequest.getDelayMs());
+        .setDelayMs(imageRequest.getDelayMs())
+        .setDiskCacheId(imageRequest.getDiskCacheId())
+        .setDownsampleOverride(imageRequest.getDownsampleOverride())
+        .setResizingAllowedOverride(imageRequest.getResizingAllowedOverride());
   }
 
   public static void addCustomUriNetworkScheme(String scheme) {
@@ -154,6 +160,9 @@ public class ImageRequestBuilder {
    */
   private ImageRequestBuilder setCachesDisabled(int cachesDisabled) {
     this.mCachesDisabled = cachesDisabled;
+    if (mCacheChoice != CacheChoice.DYNAMIC) {
+      this.mDiskCacheId = null;
+    }
     return this;
   }
 
@@ -311,7 +320,7 @@ public class ImageRequestBuilder {
     return this;
   }
 
-  private boolean isCustomNetworkUri(@Nullable Uri uri) {
+  public static boolean isCustomNetworkUri(@Nullable Uri uri) {
     if (CUSTOM_NETWORK_SCHEMES == null || uri == null) {
       return false;
     }
@@ -395,9 +404,29 @@ public class ImageRequestBuilder {
     return this;
   }
 
-  /** @return the additional request listener to use for this image request */
+  /**
+   * @return the additional request listener to use for this image request
+   */
   public @Nullable RequestListener getRequestListener() {
     return mRequestListener;
+  }
+
+  /**
+   * Sets a disk cache id to determine which diskCache to use for this request.
+   *
+   * @param diskCacheId a disk cache id to determine which diskCache to use for this request.
+   * @return the modified builder instance
+   */
+  public ImageRequestBuilder setDiskCacheId(@Nullable String diskCacheId) {
+    this.mDiskCacheId = diskCacheId;
+    return this;
+  }
+
+  /**
+   * @return the disk cache id to determine which diskCache to use for this request.
+   */
+  public @Nullable String getDiskCacheId() {
+    return mDiskCacheId;
   }
 
   /**
@@ -426,6 +455,15 @@ public class ImageRequestBuilder {
 
   public @Nullable Boolean getResizingAllowedOverride() {
     return mResizingAllowedOverride;
+  }
+
+  public ImageRequestBuilder setDownsampleOverride(@Nullable DownsampleMode downsampleOverride) {
+    this.mDownsampleOverride = downsampleOverride;
+    return this;
+  }
+
+  public @Nullable DownsampleMode getDownsampleOverride() {
+    return mDownsampleOverride;
   }
 
   public int getDelayMs() {

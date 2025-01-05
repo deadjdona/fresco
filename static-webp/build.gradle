@@ -6,6 +6,7 @@
  */
 
 import com.facebook.fresco.buildsrc.Deps
+import com.facebook.fresco.buildsrc.GradleDeps
 import com.facebook.fresco.buildsrc.TestDeps
 
 apply plugin: 'com.android.library'
@@ -19,6 +20,7 @@ dependencies {
     implementation Deps.Bolts.tasks
     implementation project(':fbcore')
     implementation project(':imagepipeline-base')
+    implementation project(':middleware')
 
     testImplementation TestDeps.junit
 
@@ -35,11 +37,14 @@ task fetchNativeDeps(dependsOn: [copyLibwebp, copyLibpng, copyLibjpeg]) {
 }
 
 android {
+    ndkVersion GradleDeps.Native.version
 
     def ndkLibs = [['static-webp', [copyLibjpeg, copyLibpng, copyLibwebp]]]
 
     buildToolsVersion FrescoConfig.buildToolsVersion
     compileSdkVersion FrescoConfig.compileSdkVersion
+
+    namespace "com.facebook.webpsupport"
 
     defaultConfig {
         minSdkVersion FrescoConfig.minSdkVersion

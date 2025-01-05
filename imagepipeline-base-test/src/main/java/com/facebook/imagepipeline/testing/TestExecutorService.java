@@ -8,13 +8,16 @@
 package com.facebook.imagepipeline.testing;
 
 import com.facebook.common.executors.SerialExecutorService;
+import com.facebook.infer.annotation.Nullsafe;
 import java.util.List;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Callable;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 /** Implementation of {@link java.util.concurrent.ExecutorService} for unit tests. */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class TestExecutorService extends AbstractExecutorService implements SerialExecutorService {
 
   protected final ScheduledQueue scheduledQueue;
@@ -41,7 +44,9 @@ public class TestExecutorService extends AbstractExecutorService implements Seri
   @Override
   public void shutdown() {}
 
+  @Nullable
   @Override
+  // NULLSAFE_FIXME[Inconsistent Subclass Return Annotation]
   public List<Runnable> shutdownNow() {
     return null;
   }

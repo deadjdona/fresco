@@ -76,7 +76,7 @@ object ImageSourceToImagePipelineAdapter {
       callerContext: Any?,
       requestListener: RequestListener?,
       uiComponentId: String,
-      extras: MutableMap<String, Any?>
+      extras: MutableMap<String, Any>
   ): Supplier<DataSource<CloseableReference<CloseableImage>>> {
     return when (imageSource) {
       is SingleImageSource -> {
@@ -171,7 +171,7 @@ object ImageSourceToImagePipelineAdapter {
   fun SingleImageSource.extractSingleRequest(
       imagePipelineUtils: ImagePipelineUtils,
       imageOptions: ImageOptions
-  ): ImageRequest? = imagePipelineUtils.buildImageRequest(uri, imageOptions)
+  ): ImageRequest? = imagePipelineUtils.buildImageRequest(imageUri, imageOptions)
 
   fun FirstAvailableImageSource.extractFirstAvailableRequest(
       imagePipelineUtils: ImagePipelineUtils,

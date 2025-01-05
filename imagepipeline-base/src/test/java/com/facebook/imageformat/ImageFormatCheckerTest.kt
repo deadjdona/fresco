@@ -11,6 +11,7 @@ import java.io.InputStream
 import java.util.ArrayList
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -18,6 +19,11 @@ import org.robolectric.RobolectricTestRunner
 /** Tests [ImageFormatChecker] */
 @RunWith(RobolectricTestRunner::class)
 class ImageFormatCheckerTest constructor() {
+
+  @Before
+  fun setUp() {
+    ImageFormatChecker.instance.setBinaryXmlEnabled(true)
+  }
 
   @Test
   fun testSimpleWebps() {
@@ -68,6 +74,27 @@ class ImageFormatCheckerTest constructor() {
   @Test
   fun testHeifs() {
     singleImageTypeTest(getName("heifs/1.heif"), DefaultImageFormats.HEIF)
+  }
+
+  @Test
+  fun testXmlVectorDrawable() {
+    singleImageTypeTest(
+        getName("xmls/compiled/vector_drawable.xml"), DefaultImageFormats.BINARY_XML)
+  }
+
+  @Test
+  fun testXmlLayerListDrawable() {
+    singleImageTypeTest(getName("xmls/compiled/layer_list.xml"), DefaultImageFormats.BINARY_XML)
+  }
+
+  @Test
+  fun testXmlLevelListDrawable() {
+    singleImageTypeTest(getName("xmls/compiled/level_list.xml"), DefaultImageFormats.BINARY_XML)
+  }
+
+  @Test
+  fun testXmlStateListDrawable() {
+    singleImageTypeTest(getName("xmls/compiled/state_list.xml"), DefaultImageFormats.BINARY_XML)
   }
 
   private fun singleImageTypeTest(resourceNames: List<String>, expectedImageType: ImageFormat) {

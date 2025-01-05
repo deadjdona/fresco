@@ -17,6 +17,7 @@ import com.facebook.fresco.samples.showcase.imageformat.override.ImageFormatOver
 import com.facebook.fresco.samples.showcase.imageformat.pjpeg.ImageFormatProgressiveJpegFragment
 import com.facebook.fresco.samples.showcase.imageformat.svg.ImageFormatSvgFragment
 import com.facebook.fresco.samples.showcase.imageformat.webp.ImageFormatWebpFragment
+import com.facebook.fresco.samples.showcase.imageformat.xml.ImageFormatXmlFragment
 import com.facebook.fresco.samples.showcase.imagepipeline.*
 import com.facebook.fresco.samples.showcase.misc.WelcomeFragment
 import com.facebook.fresco.samples.showcase.settings.SettingsFragment
@@ -37,21 +38,16 @@ object ExampleDatabase {
           ExampleCategory(
               "Drawee",
               listOf(
-                  ExampleItem("Media Provider") { DraweeMediaPickerFragment() },
-                  ExampleItem("Scale Type") { DraweeScaleTypeFragment() },
                   ExampleItem("Simple DraweeSpan") { DraweeSpanSimpleTextFragment() },
-                  ExampleItem("Rounded Corners") { DraweeRoundedCornersFragment() },
-                  ExampleItem("Placeholder, Progress, Failure") { DraweeHierarchyFragment() },
-                  ExampleItem("Rotation") { DraweeRotationFragment() },
-                  ExampleItem("Recycler View") { DraweeRecyclerViewFragment() },
                   ExampleItem("Drawee Transition") { DraweeTransitionFragment() },
                   ExampleItem("Retaining Data Source Supplier") {
                     RetainingDataSourceSupplierFragment()
                   },
-                  ExampleItem("Multi URI") { MultiUriFragment() })),
+              )),
           ExampleCategory(
               "Image Pipeline",
               listOf(
+                  ExampleItem("Downsample Modes") { ImagePipelineDownsampleFragment() },
                   ExampleItem("Notifications") { ImagePipelineNotificationFragment() },
                   ExampleItem("Post-Processor") { ImagePipelinePostProcessorFragment() },
                   ExampleItem("Prefetch") { ImagePipelinePrefetchFragment() },
@@ -61,7 +57,9 @@ object ExampleDatabase {
                   },
                   ExampleItem("Partial Image Loading") { PartialRequestFragment() },
                   ExampleItem("Platform Bitmap Factory") { ImagePipelineBitmapFactoryFragment() },
-                  ExampleItem("Region Decoding") { ImagePipelineRegionDecodingFragment() })),
+                  ExampleItem("Region Decoding") { ImagePipelineRegionDecodingFragment() },
+              ),
+          ),
           ExampleCategory(
               "Image Formats",
               listOf(
@@ -72,7 +70,10 @@ object ExampleDatabase {
                   ExampleItem("SVG") { ImageFormatSvgFragment() },
                   ExampleItem("Keyframes") { ImageFormatKeyframesFragment() },
                   ExampleItem("Decoder Override") { ImageFormatOverrideExample() },
-                  ExampleItem("Data URI") { ImageFormatDataUriFragment() })),
+                  ExampleItem("Data URI") { ImageFormatDataUriFragment() },
+                  ExampleItem("XML") { ImageFormatXmlFragment() },
+              ),
+          ),
           ExampleCategory(
               "Fresco Vito",
               listOf(
@@ -93,6 +94,8 @@ object ExampleDatabase {
                       "Vito Litho: Listener",
                       FrescoVitoLithoListenerExample,
                       "Vito Litho component with listener."),
+                  ExampleItem("Scale Type") { VitoScaleTypeFragment() },
+                  ExampleItem("Rotation") { VitoRotationFragment() },
                   ExampleItem("Vito Litho: Gallery") { FrescoVitoLithoGalleryFragment() },
                   ExampleItem("Vito View: Simple") { VitoViewSimpleFragment() },
                   ExampleItem("Vito View: Simple 2") { VitoSimpleFragment() },
@@ -108,6 +111,10 @@ object ExampleDatabase {
                   ExampleItem("Vito Text Span") { VitoSpanFragment() },
                   ExampleItem(
                       "Vito Litho DrawableImageSource", FrescoVitoLithoDrawableImageSourceExample),
+                  ExampleItem("Media Provider") { VitoMediaPickerFragment() },
+                  ExampleItem("Multi URI") { MultiUriFragment() },
+                  ExampleItem("Placeholder, Progress, Failure") { ImageLayersFragment() },
+                  ExampleItem("Rounded Corners") { VitoRoundedCornersFragment() },
               )),
           ExampleCategory(
               "Vito Renderer",

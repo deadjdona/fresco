@@ -7,7 +7,10 @@
 
 package com.facebook.fresco.animation.frame;
 
+import com.facebook.infer.annotation.Nullsafe;
+
 /** Frame scheduler used to calculate which frame to display for given animation times. */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public interface FrameScheduler {
 
   int FRAME_NUMBER_DONE = -1;
@@ -49,6 +52,8 @@ public interface FrameScheduler {
    */
   long getTargetRenderTimeForNextFrameMs(long animationTimeMs);
 
-  /** @return true if the animation is infinite */
+  /**
+   * @return true if the animation is infinite
+   */
   boolean isInfiniteAnimation();
 }

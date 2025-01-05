@@ -6,6 +6,7 @@
  */
 
 import com.facebook.fresco.buildsrc.Deps
+import com.facebook.fresco.buildsrc.GradleDeps
 import com.facebook.fresco.buildsrc.SampleDeps
 
 apply plugin: 'com.android.application'
@@ -23,8 +24,12 @@ dependencies {
 }
 
 android {
+    ndkVersion GradleDeps.Native.version
+
     buildToolsVersion FrescoConfig.buildToolsVersion
     compileSdkVersion FrescoConfig.compileSdkVersion
+
+    namespace "com.facebook.samples.animation2"
 
     defaultConfig {
         applicationId "com.facebook.samples.animation2"

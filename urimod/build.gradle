@@ -10,9 +10,15 @@ import com.facebook.fresco.buildsrc.Deps
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
+kotlin {
+    jvmToolchain(11)
+}
+
 android {
     buildToolsVersion FrescoConfig.buildToolsVersion
     compileSdkVersion FrescoConfig.compileSdkVersion
+
+    namespace "com.facebook.fresco.urimod"
 
     defaultConfig {
         minSdkVersion FrescoConfig.minSdkVersion
@@ -24,7 +30,8 @@ dependencies {
     compileOnly Deps.jsr305
     compileOnly Deps.inferAnnotation
     implementation project(path: ':fbcore')
-    implementation project(':drawee')
+    implementation project(':ui-core')
+    implementation project(':vito:source')
 }
 
 apply plugin: "com.vanniktech.maven.publish"

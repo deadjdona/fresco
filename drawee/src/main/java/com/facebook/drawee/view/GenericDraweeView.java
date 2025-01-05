@@ -23,21 +23,12 @@ import javax.annotation.Nullable;
  *
  * <p>The hierarchy can be set either programmatically or inflated from XML. See {@link
  * GenericDraweeHierarchyInflater} for supported XML attributes.
+ *
+ * <p>This class has been deprecated. Please use VitoView instead.
  */
 @Nullsafe(Nullsafe.Mode.LOCAL)
+@Deprecated
 public class GenericDraweeView extends DraweeView<GenericDraweeHierarchy> {
-
-  private static @Nullable InflateHierarchyListener sInflateHierarchyListener;
-
-  public static void setInflateHierarchyListener(
-      @Nullable InflateHierarchyListener inflateHierarchyListener) {
-    sInflateHierarchyListener = inflateHierarchyListener;
-  }
-
-  public interface InflateHierarchyListener {
-    void onInflateHierarchy(
-        GenericDraweeView draweeview, Context context, @Nullable AttributeSet attrs);
-  }
 
   public GenericDraweeView(Context context, GenericDraweeHierarchy hierarchy) {
     super(context);
@@ -73,9 +64,6 @@ public class GenericDraweeView extends DraweeView<GenericDraweeHierarchy> {
         GenericDraweeHierarchyInflater.inflateBuilder(context, attrs);
     setAspectRatio(builder.getDesiredAspectRatio());
     setHierarchy(builder.build());
-    if (sInflateHierarchyListener != null) {
-      sInflateHierarchyListener.onInflateHierarchy(this, context, attrs);
-    }
     if (FrescoSystrace.isTracing()) {
       FrescoSystrace.endSection();
     }

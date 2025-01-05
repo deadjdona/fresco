@@ -61,6 +61,7 @@ class ImagePipelineUtilsImpl(private val imageDecodeOptionsProvider: ImageDecode
   ): ImageRequestBuilder? =
       imageRequestBuilder?.apply {
         imageOptions.resizeOptions?.let { resizeOptions = it }
+        imageOptions.downsampleOverride?.let { downsampleOverride = it }
         imageOptions.rotationOptions?.let { rotationOptions = it }
         imageDecodeOptionsProvider.create(imageRequestBuilder, imageOptions)?.let {
           imageDecodeOptions = it
@@ -82,6 +83,9 @@ class ImagePipelineUtilsImpl(private val imageDecodeOptionsProvider: ImageDecode
     maybeSetRequestPriority(builder, imageOptions.priority)
     if (imageOptions.cacheChoice != null) {
       builder.cacheChoice = imageOptions.cacheChoice
+    }
+    if (imageOptions.diskCacheId != null) {
+      builder.diskCacheId = imageOptions.diskCacheId
     }
     return builder
   }

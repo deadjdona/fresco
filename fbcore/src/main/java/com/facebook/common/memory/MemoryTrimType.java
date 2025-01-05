@@ -31,6 +31,9 @@ public enum MemoryTrimType {
   /** The system as a whole is running out of memory, and this application is in the background. */
   OnSystemLowMemoryWhileAppInBackgroundLowSeverity(1),
 
+  /** The system as a whole is running out of memory, and this application is in the background. */
+  OnSystemModerateMemory(0.5),
+
   /** This app is moving into the background, usually because the user navigated to another app. */
   OnAppBackgrounded(1),
 
@@ -55,5 +58,15 @@ public enum MemoryTrimType {
   /** Get the recommended percentage by which to trim the cache on receiving this event. */
   public double getSuggestedTrimRatio() {
     return mSuggestedTrimRatio;
+  }
+
+  /** Map an integer to a MemoryTrimType enum. */
+  public static MemoryTrimType fromInt(int type) {
+    for (MemoryTrimType trimType : MemoryTrimType.values()) {
+      if (trimType.ordinal() == type) {
+        return trimType;
+      }
+    }
+    throw new IllegalArgumentException("Unknown type: " + type);
   }
 }

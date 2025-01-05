@@ -8,17 +8,17 @@
 package com.facebook.drawee.backends.pipeline.info;
 
 import android.graphics.Rect;
-import com.facebook.common.internal.Supplier;
 import com.facebook.common.time.MonotonicClock;
 import com.facebook.drawee.backends.pipeline.PipelineDraweeController;
-import com.facebook.drawee.backends.pipeline.info.internal.ImagePerfControllerListener2;
 import com.facebook.drawee.backends.pipeline.info.internal.ImagePerfRequestListener;
+import com.facebook.drawee.backends.pipeline.info.internal.ImagePerfStateManager;
 import com.facebook.drawee.interfaces.DraweeHierarchy;
 import com.facebook.fresco.ui.common.ImageLoadStatus;
 import com.facebook.fresco.ui.common.ImagePerfData;
 import com.facebook.fresco.ui.common.ImagePerfDataListener;
 import com.facebook.fresco.ui.common.ImagePerfNotifier;
 import com.facebook.fresco.ui.common.ImagePerfState;
+import com.facebook.fresco.ui.common.ImageRenderingInfra;
 import com.facebook.fresco.ui.common.VisibilityState;
 import com.facebook.imagepipeline.listener.ForwardingRequestListener;
 import com.facebook.infer.annotation.Nullsafe;
@@ -26,16 +26,15 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import javax.annotation.Nullable;
 
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class ImagePerfMonitor implements ImagePerfNotifier {
 
   private final PipelineDraweeController mPipelineDraweeController;
   private final MonotonicClock mMonotonicClock;
   private final ImagePerfState mImagePerfState;
-  private final Supplier<Boolean> mAsyncLogging;
 
   private @Nullable ImagePerfRequestListener mImagePerfRequestListener;
-  private @Nullable ImagePerfControllerListener2 mImagePerfControllerListener2;
+  private @Nullable ImagePerfStateManager mImagePerfStateManager;
   private @Nullable ForwardingRequestListener mForwardingRequestListener;
 
   private @Nullable List<ImagePerfDataListener> mImagePerfDataListeners;
@@ -43,28 +42,25 @@ public class ImagePerfMonitor implements ImagePerfNotifier {
   private boolean mEnabled;
 
   public ImagePerfMonitor(
-      MonotonicClock monotonicClock,
-      PipelineDraweeController pipelineDraweeController,
-      Supplier<Boolean> asyncLogging) {
+      MonotonicClock monotonicClock, PipelineDraweeController pipelineDraweeController) {
     mMonotonicClock = monotonicClock;
     mPipelineDraweeController = pipelineDraweeController;
-    mImagePerfState = new ImagePerfState();
-    mAsyncLogging = asyncLogging;
+    mImagePerfState = new ImagePerfState(ImageRenderingInfra.DRAWEE);
   }
 
   public void setEnabled(boolean enabled) {
     mEnabled = enabled;
     if (enabled) {
       setupListeners();
-      if (mImagePerfControllerListener2 != null) {
-        mPipelineDraweeController.addControllerListener2(mImagePerfControllerListener2);
+      if (mImagePerfStateManager != null) {
+        mPipelineDraweeController.addControllerListener2(mImagePerfStateManager);
       }
       if (mForwardingRequestListener != null) {
         mPipelineDraweeController.addRequestListener(mForwardingRequestListener);
       }
     } else {
-      if (mImagePerfControllerListener2 != null) {
-        mPipelineDraweeController.removeControllerListener2(mImagePerfControllerListener2);
+      if (mImagePerfStateManager != null) {
+        mPipelineDraweeController.removeControllerListener2(mImagePerfStateManager);
       }
       if (mForwardingRequestListener != null) {
         mPipelineDraweeController.removeRequestListener(mForwardingRequestListener);
@@ -111,8 +107,7 @@ public class ImagePerfMonitor implements ImagePerfNotifier {
   }
 
   @Override
-  public void notifyListenersOfVisibilityStateUpdate(
-      ImagePerfState state, VisibilityState visibilityState) {
+  public void notifyVisibilityUpdated(ImagePerfState state, VisibilityState visibilityState) {
     if (!mEnabled || mImagePerfDataListeners == null || mImagePerfDataListeners.isEmpty()) {
       return;
     }
@@ -133,9 +128,8 @@ public class ImagePerfMonitor implements ImagePerfNotifier {
   }
 
   private void setupListeners() {
-    if (mImagePerfControllerListener2 == null) {
-      mImagePerfControllerListener2 =
-          new ImagePerfControllerListener2(mMonotonicClock, mImagePerfState, this, mAsyncLogging);
+    if (mImagePerfStateManager == null) {
+      mImagePerfStateManager = new ImagePerfStateManager(mMonotonicClock, mImagePerfState, this);
     }
     if (mImagePerfRequestListener == null) {
       mImagePerfRequestListener = new ImagePerfRequestListener(mMonotonicClock, mImagePerfState);

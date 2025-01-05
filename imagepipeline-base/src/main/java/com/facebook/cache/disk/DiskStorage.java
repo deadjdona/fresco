@@ -22,7 +22,7 @@ import javax.annotation.Nullable;
  * Storage for files in the cache. Responsible for maintaining state (count, size, watch file
  * existence, reachability)
  */
-@Nullsafe(Nullsafe.Mode.STRICT)
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public interface DiskStorage {
 
   class DiskDumpInfoEntry {
@@ -156,8 +156,10 @@ public interface DiskStorage {
   interface Entry {
     /** the id representing the resource */
     String getId();
+
     /** calculated on first time and never changes so it can be used as immutable * */
     long getTimestamp();
+
     /** calculated on first time and never changes so it can be used as immutable * */
     long getSize();
 

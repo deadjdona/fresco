@@ -17,7 +17,6 @@ import com.facebook.common.logging.FLog
 import com.facebook.common.references.CloseableReference
 import com.facebook.datasource.DataSource
 import com.facebook.drawee.backends.pipeline.info.ImageOrigin
-import com.facebook.fresco.ui.common.ControllerListener2
 import com.facebook.fresco.ui.common.ImagePerfDataListener
 import com.facebook.fresco.ui.common.ImagePerfDataNotifier
 import com.facebook.fresco.ui.common.OnFadeListener
@@ -25,6 +24,7 @@ import com.facebook.fresco.ui.common.VitoUtils
 import com.facebook.fresco.vito.core.FrescoController2
 import com.facebook.fresco.vito.core.FrescoDrawableInterface
 import com.facebook.fresco.vito.core.FrescoVitoConfig
+import com.facebook.fresco.vito.core.ImagePerfLoggingListener
 import com.facebook.fresco.vito.core.VitoImagePerfListener
 import com.facebook.fresco.vito.core.VitoImagePipeline
 import com.facebook.fresco.vito.core.VitoImageRequest
@@ -41,7 +41,6 @@ import com.facebook.fresco.vito.source.DrawableImageSource
 import com.facebook.imagepipeline.image.CloseableBitmap
 import com.facebook.imagepipeline.image.CloseableImage
 import com.facebook.imagepipeline.image.CloseableStaticBitmap
-import com.facebook.imagepipeline.image.ImageInfo
 import com.facebook.imagepipeline.image.ImageInfoImpl
 import com.facebook.imagepipeline.image.ImmutableQualityInfo
 import com.facebook.imagepipeline.systrace.FrescoSystrace.traceSection
@@ -53,10 +52,9 @@ class KFrescoController(
     private val uiThreadExecutor: Executor,
     private val lightweightBackgroundThreadExecutor: Executor,
     private val globalImageRequestListener: VitoImageRequestListener? = null,
-    private val imagePerfControllerListenerSupplier: Supplier<ControllerListener2<ImageInfo>>? =
-        null,
+    private val imagePerfLoggingListenerSupplier: Supplier<ImagePerfLoggingListener>? = null,
     private val imagePerfListener: VitoImagePerfListener = BaseVitoImagePerfListener(),
-    private val drawableFactory: ImageOptionsDrawableFactory? = null
+    private val drawableFactory: ImageOptionsDrawableFactory? = null,
 ) : FrescoController2 {
 
   private val imageToDataModelMapper: (Resources, CloseableImage, ImageOptions) -> ImageDataModel? =
@@ -65,25 +63,37 @@ class KFrescoController(
           b.customDrawableFactory?.createDrawable(r, a, b)?.let { createDrawableModel(it, b) }
               ?: when (a) {
                 is CloseableBitmap ->
-                    BitmapImageDataModel(
-                        a.underlyingBitmap,
-                        java.lang.Boolean.TRUE.equals(a.getExtras()["is_rounded"]))
+                    BitmapImageDataModel(a.underlyingBitmap, true == a.getExtras()["is_rounded"])
                 // TODO(T105148151): handle rotation for closeable static bitmap, handle other types
                 else -> {
                   drawableFactory?.createDrawable(r, a, b)?.let { createDrawableModel(it, b) }
                 }
+              }
+              ?: run {
+                FLog.e(TAG, "Could not create Drawable for CloseableImage: $b")
+                null
               }
         }
       }
 
   var debugOverlayHandler: DebugOverlayHandler? = null
 
-  override fun <T> createDrawable(): T where T : Drawable, T : FrescoDrawableInterface {
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> createDrawable(uiFramework: String?): T where
+  T : Drawable,
+  T : FrescoDrawableInterface {
     traceSection("KFrescoController#createDrawable") {
-      val drawable = KFrescoVitoDrawable(imagePerfListener)
-      imagePerfControllerListenerSupplier?.get()?.let { bla ->
-        drawable.listenerManager.setImagePerfControllerListener(bla)
-      }
+      val drawable =
+          KFrescoVitoDrawable(
+              imagePerfListener,
+              config.experimentalResetVitoImageRequestListener(),
+              config.experimentalResetLocalVitoImageRequestListener(),
+              config.experimentalResetLocalImagePerfStateListener(),
+              config.experimentalResetControllerListener2())
+      drawable.uiFramework = uiFramework
+      imagePerfLoggingListenerSupplier
+          ?.get()
+          ?.let(drawable.listenerManager::setImagePerfLoggingListener)
       return drawable as T
     }
   }
@@ -127,8 +137,7 @@ class KFrescoController(
         listenerManager.setLocalVitoImageRequestListener(vitoImageRequestListener)
 
         // Setup local perf data listener
-        val localPerfStateListener =
-            perfDataListener?.let { listener -> ImagePerfDataNotifier(listener) }
+        val localPerfStateListener = perfDataListener?.let(::ImagePerfDataNotifier)
         listenerManager.setLocalImagePerfStateListener(localPerfStateListener)
 
         _imageId = imageId
@@ -174,16 +183,24 @@ class KFrescoController(
 
       // Check if the image is in cache
       val cachedImage = vitoImagePipeline.getCachedImage(imageRequest)
-      if (drawable.setActualImage(imageRequest, cachedImage)) {
+
+      val isIntermediateImage =
+          config.useIntermediateImagesAsPlaceholder() &&
+              cachedImage?.get()?.qualityInfo?.isOfFullQuality != true
+      val hasImage = drawable.setActualImage(imageRequest, cachedImage, isIntermediateImage)
+      if (hasImage && !isIntermediateImage) {
+        // Immediately return since we have the full image
         return true
       }
 
-      // The image is not in cache -> Set up layers visible until the image is available
-      drawable.placeholderLayer.setPlaceholder(imageRequest.resources, options)
-      drawable.listenerManager.onPlaceholderSet(
-          imageId, imageRequest, drawable.placeholderLayer.getDataModel().maybeGetDrawable())
+      if (!hasImage) {
+        // The image is not in cache -> Set up layers visible until the image is available
+        drawable.placeholderLayer.setPlaceholder(imageRequest.resources, options)
+        drawable.listenerManager.onPlaceholderSet(
+            imageId, imageRequest, drawable.placeholderLayer.getDataModel().maybeGetDrawable())
 
-      drawable.setupProgressLayer(imageRequest.resources, options)
+        drawable.setupProgressLayer(imageRequest.resources, options)
+      }
 
       // Fetch the image
       lightweightBackgroundThreadExecutor.execute {
@@ -243,21 +260,24 @@ class KFrescoController(
    */
   private fun KFrescoVitoDrawable.setActualImage(
       imageRequest: VitoImageRequest,
-      imageReference: CloseableReference<CloseableImage>?
+      imageReference: CloseableReference<CloseableImage>?,
+      isIntermediateImage: Boolean = false,
   ): Boolean {
     traceSection("KFrescoController#setActualImage") {
       try {
         if (CloseableReference.isValid(imageReference)) {
           // Immediately display the actual image.
-          val image = imageReference?.get()
-          if (image != null) {
-            setFetchSubmitted(true)
-            closeable = imageReference.clone()
-            actualImageLayer.setActualImage(
-                imageRequest.resources, imageRequest.imageOptions, image, imageToDataModelMapper)
-            // TODO(T105148151): trigger listeners
-            invalidateSelf()
-            val imageInfo = image.imageInfo
+          val image = imageReference?.get() ?: return false
+          setFetchSubmitted(true)
+          closeable = imageReference.clone()
+          actualImageLayer.setActualImage(
+              imageRequest.resources, imageRequest.imageOptions, image, imageToDataModelMapper)
+          // TODO(T105148151): trigger listeners
+          invalidateSelf()
+          val imageInfo = image.imageInfo
+          if (isIntermediateImage) {
+            listenerManager.onIntermediateImageSet(imageId, imageRequest, imageInfo)
+          } else {
             listenerManager.onFinalImageSet(
                 imageId,
                 imageRequest,
@@ -265,9 +285,9 @@ class KFrescoController(
                 imageInfo,
                 obtainExtras(null, imageReference),
                 actualImageDrawable)
-            debugOverlayHandler?.update(this)
-            return true
           }
+          debugOverlayHandler?.update(this)
+          return true
         }
       } finally {
         CloseableReference.closeSafely(imageReference)

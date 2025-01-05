@@ -13,7 +13,6 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.anyObject;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -21,9 +20,12 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import android.net.Uri;
+import bolts.Task;
 import com.facebook.cache.common.CacheKey;
+import com.facebook.cache.common.DebuggingCacheKey;
 import com.facebook.cache.common.MultiCacheKey;
 import com.facebook.cache.common.SimpleCacheKey;
+import com.facebook.common.internal.ImmutableMap;
 import com.facebook.common.internal.Predicate;
 import com.facebook.common.internal.Sets;
 import com.facebook.common.internal.Supplier;
@@ -45,6 +47,7 @@ import com.facebook.imagepipeline.producers.ThreadHandoffProducerQueue;
 import com.facebook.imagepipeline.request.ImageRequest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -56,11 +59,13 @@ import org.robolectric.RobolectricTestRunner;
 /** Tests for ImagePipeline */
 @RunWith(RobolectricTestRunner.class)
 public class ImagePipelineTest {
+
   @Mock public ImageRequest mImageRequest;
   @Mock public ProducerSequenceFactory mProducerSequenceFactory;
   @Mock public CacheKeyFactory mCacheKeyFactory;
   @Mock public Object mCallerContext;
   @Mock public ImagePipelineConfigInterface mConfig;
+  @Mock public ImagePipelineExperiments mImagePipelineExperiments;
 
   private Supplier<Boolean> mPrefetchEnabledSupplier;
   private Supplier<Boolean> mSuppressBitmapPrefetchingSupplier;
@@ -68,8 +73,14 @@ public class ImagePipelineTest {
   private ImagePipeline mImagePipeline;
   private MemoryCache<CacheKey, CloseableImage> mBitmapMemoryCache;
   private MemoryCache<CacheKey, PooledByteBuffer> mEncodedMemoryCache;
+  private Supplier<DiskCachesStore> mDiskCachesStoreSupplier;
   private BufferedDiskCache mMainDiskStorageCache;
   private BufferedDiskCache mSmallImageDiskStorageCache;
+  private BufferedDiskCache mDynamicBufferedDiskCache;
+  private BufferedDiskCache mDynamicBufferedDiskCache2;
+  private BufferedDiskCache mDynamicBufferedDiskCache3;
+
+  private Map<String, BufferedDiskCache> mDynamicBufferedDiskCaches;
   private RequestListener mRequestListener1;
   private RequestListener mRequestListener2;
   private ThreadHandoffProducerQueue mThreadHandoffProducerQueue;
@@ -89,6 +100,25 @@ public class ImagePipelineTest {
     mEncodedMemoryCache = mock(MemoryCache.class);
     mMainDiskStorageCache = mock(BufferedDiskCache.class);
     mSmallImageDiskStorageCache = mock(BufferedDiskCache.class);
+    mDynamicBufferedDiskCache = mock(BufferedDiskCache.class);
+    mDynamicBufferedDiskCache2 = mock(BufferedDiskCache.class);
+    mDynamicBufferedDiskCache3 = mock(BufferedDiskCache.class);
+
+    mDynamicBufferedDiskCaches =
+        ImmutableMap.of(
+            "dynamicId1",
+            mDynamicBufferedDiskCache,
+            "dynamicId2",
+            mDynamicBufferedDiskCache2,
+            "dynamicId3",
+            mDynamicBufferedDiskCache3);
+    mDiskCachesStoreSupplier = mock(Supplier.class);
+    DiskCachesStore diskCachesStore = mock(DiskCachesStore.class);
+    when(mDiskCachesStoreSupplier.get()).thenReturn(diskCachesStore);
+    when(diskCachesStore.getMainBufferedDiskCache()).thenReturn(mMainDiskStorageCache);
+    when(diskCachesStore.getSmallImageBufferedDiskCache()).thenReturn(mSmallImageDiskStorageCache);
+    when(diskCachesStore.getDynamicBufferedDiskCaches())
+        .thenReturn(ImmutableMap.copyOf(mDynamicBufferedDiskCaches));
     mThreadHandoffProducerQueue = mock(ThreadHandoffProducerQueue.class);
     mImagePipeline =
         new ImagePipeline(
@@ -98,8 +128,7 @@ public class ImagePipelineTest {
             mPrefetchEnabledSupplier,
             mBitmapMemoryCache,
             mEncodedMemoryCache,
-            mMainDiskStorageCache,
-            mSmallImageDiskStorageCache,
+            mDiskCachesStoreSupplier,
             mCacheKeyFactory,
             mThreadHandoffProducerQueue,
             mSuppressBitmapPrefetchingSupplier,
@@ -112,6 +141,10 @@ public class ImagePipelineTest {
     when(mImageRequest.getLowestPermittedRequestLevel())
         .thenReturn(ImageRequest.RequestLevel.FULL_FETCH);
     when(mImageRequest.shouldDecodePrefetches()).thenReturn(null);
+    when(mImageRequest.getSourceUri()).thenReturn(Uri.parse("http://www.test.org/"));
+
+    when(mConfig.getExperiments()).thenReturn(mImagePipelineExperiments);
+    when(mImagePipelineExperiments.getPrefetchShortcutEnabled()).thenReturn(false);
   }
 
   @Test
@@ -463,6 +496,7 @@ public class ImagePipelineTest {
     mImagePipeline.evictFromDiskCache(uri);
     verify(mMainDiskStorageCache).remove(multiKey);
     verify(mSmallImageDiskStorageCache).remove(multiKey);
+    verify(mDynamicBufferedDiskCache).remove(multiKey);
   }
 
   @Test
@@ -497,17 +531,102 @@ public class ImagePipelineTest {
   }
 
   @Test
+  public void testIsInDiskCacheFromMainDiskCache__Sync() {
+    when(mImageRequest.getCacheChoice()).thenReturn(ImageRequest.CacheChoice.DEFAULT);
+    CacheKey cacheKey = mock(DebuggingCacheKey.class);
+    when(mMainDiskStorageCache.diskCheckSync(cacheKey)).thenReturn(true);
+    when(mCacheKeyFactory.getEncodedCacheKey(any(ImageRequest.class), anyObject()))
+        .thenReturn(cacheKey);
+    assertTrue(mImagePipeline.isInDiskCacheSync(mImageRequest));
+  }
+
+  @Test
+  public void testIsInDiskCacheFromSmallDiskCache__Sync() {
+    when(mImageRequest.getCacheChoice()).thenReturn(ImageRequest.CacheChoice.SMALL);
+    CacheKey cacheKey = mock(DebuggingCacheKey.class);
+    when(mSmallImageDiskStorageCache.diskCheckSync(cacheKey)).thenReturn(true);
+    when(mCacheKeyFactory.getEncodedCacheKey(any(ImageRequest.class), anyObject()))
+        .thenReturn(cacheKey);
+    assertTrue(mImagePipeline.isInDiskCacheSync(mImageRequest));
+  }
+
+  @Test
+  public void testIsInDiskCacheFromDynamicDiskCache__Sync() {
+    when(mImageRequest.getCacheChoice()).thenReturn(ImageRequest.CacheChoice.DYNAMIC);
+    when(mImageRequest.getDiskCacheId()).thenReturn("dynamicId1");
+    CacheKey cacheKey = mock(DebuggingCacheKey.class);
+    when(mDynamicBufferedDiskCache.diskCheckSync(cacheKey)).thenReturn(true);
+    when(mCacheKeyFactory.getEncodedCacheKey(any(ImageRequest.class), anyObject()))
+        .thenReturn(cacheKey);
+    assertTrue(mImagePipeline.isInDiskCacheSync(mImageRequest));
+  }
+
+  @Test
+  public void testIsInDiskCacheFromDynamicDiskCache__Sync_InvalidDiskCacheId() {
+    when(mImageRequest.getCacheChoice()).thenReturn(ImageRequest.CacheChoice.DYNAMIC);
+    when(mImageRequest.getDiskCacheId()).thenReturn("invalidDynamicId");
+    CacheKey cacheKey = mock(DebuggingCacheKey.class);
+    when(mDynamicBufferedDiskCache.diskCheckSync(cacheKey)).thenReturn(true);
+    when(mCacheKeyFactory.getEncodedCacheKey(any(ImageRequest.class), anyObject()))
+        .thenReturn(cacheKey);
+    assertFalse(mImagePipeline.isInDiskCacheSync(mImageRequest));
+  }
+
+  @Test
   public void testIsInDiskCacheFromMainDiskCache() {
     when(mImageRequest.getCacheChoice()).thenReturn(ImageRequest.CacheChoice.DEFAULT);
-    when(mMainDiskStorageCache.diskCheckSync(isNull(CacheKey.class))).thenReturn(true);
-    assertTrue(mImagePipeline.isInDiskCacheSync(mImageRequest));
+    CacheKey cacheKey = mock(DebuggingCacheKey.class);
+    when(mMainDiskStorageCache.contains(cacheKey)).thenReturn(Task.forResult(true));
+
+    when(mCacheKeyFactory.getEncodedCacheKey(any(ImageRequest.class), anyObject()))
+        .thenReturn(cacheKey);
+    assertTrue(mImagePipeline.isInDiskCache(mImageRequest).getResult());
   }
 
   @Test
   public void testIsInDiskCacheFromSmallDiskCache() {
     when(mImageRequest.getCacheChoice()).thenReturn(ImageRequest.CacheChoice.SMALL);
-    when(mSmallImageDiskStorageCache.diskCheckSync(isNull(CacheKey.class))).thenReturn(true);
-    assertTrue(mImagePipeline.isInDiskCacheSync(mImageRequest));
+    CacheKey cacheKey = mock(DebuggingCacheKey.class);
+
+    when(mMainDiskStorageCache.contains(cacheKey)).thenReturn(Task.forResult(false));
+    when(mSmallImageDiskStorageCache.contains(cacheKey)).thenReturn(Task.forResult(true));
+
+    when(mCacheKeyFactory.getEncodedCacheKey(any(ImageRequest.class), anyObject()))
+        .thenReturn(cacheKey);
+    assertTrue(mImagePipeline.isInDiskCache(mImageRequest).getResult());
+  }
+
+  @Test
+  public void testIsInDiskCacheFromDynamicDiskCache() {
+    when(mImageRequest.getCacheChoice()).thenReturn(ImageRequest.CacheChoice.DYNAMIC);
+    CacheKey cacheKey = mock(DebuggingCacheKey.class);
+
+    when(mMainDiskStorageCache.contains(cacheKey)).thenReturn(Task.forResult(false));
+    when(mSmallImageDiskStorageCache.contains(cacheKey)).thenReturn(Task.forResult(false));
+    when(mDynamicBufferedDiskCache.contains(cacheKey)).thenReturn(Task.forResult(false));
+    when(mDynamicBufferedDiskCache2.contains(cacheKey)).thenReturn(Task.forResult(true));
+    when(mDynamicBufferedDiskCache3.contains(cacheKey)).thenReturn(Task.forResult(false));
+
+    when(mCacheKeyFactory.getEncodedCacheKey(any(ImageRequest.class), anyObject()))
+        .thenReturn(cacheKey);
+    assertTrue(mImagePipeline.isInDiskCache(mImageRequest).getResult());
+  }
+
+  @Test
+  public void testIsInDiskCacheFromDynamicDiskCache__SpecifiedDiskCacheId() {
+    when(mImageRequest.getCacheChoice()).thenReturn(ImageRequest.CacheChoice.DYNAMIC);
+    CacheKey cacheKey = mock(DebuggingCacheKey.class);
+
+    when(mMainDiskStorageCache.contains(cacheKey)).thenReturn(Task.forResult(false));
+    when(mSmallImageDiskStorageCache.contains(cacheKey)).thenReturn(Task.forResult(false));
+    when(mDynamicBufferedDiskCache.contains(cacheKey)).thenReturn(Task.forResult(false));
+    when(mDynamicBufferedDiskCache2.contains(cacheKey)).thenReturn(Task.forResult(false));
+    when(mDynamicBufferedDiskCache3.contains(cacheKey)).thenReturn(Task.forResult(true));
+    when(mImageRequest.getDiskCacheId()).thenReturn("dynamicId3");
+
+    when(mCacheKeyFactory.getEncodedCacheKey(any(ImageRequest.class), anyObject()))
+        .thenReturn(cacheKey);
+    assertTrue(mImagePipeline.isInDiskCache(mImageRequest).getResult());
   }
 
   @Test
@@ -515,6 +634,7 @@ public class ImagePipelineTest {
     mImagePipeline.clearDiskCaches();
     verify(mMainDiskStorageCache).clearAll();
     verify(mSmallImageDiskStorageCache).clearAll();
+    verify(mDynamicBufferedDiskCache).clearAll();
   }
 
   @Test
@@ -522,6 +642,7 @@ public class ImagePipelineTest {
     mImagePipeline.getUsedDiskCacheSize();
     verify(mMainDiskStorageCache).getSize();
     verify(mSmallImageDiskStorageCache).getSize();
+    verify(mDynamicBufferedDiskCache).getSize();
   }
 
   @Test
