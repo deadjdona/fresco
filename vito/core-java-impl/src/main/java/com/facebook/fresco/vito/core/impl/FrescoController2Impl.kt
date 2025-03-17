@@ -27,6 +27,7 @@ import com.facebook.fresco.ui.common.ImagePerfDataNotifier
 import com.facebook.fresco.ui.common.ImagePerfNotifier
 import com.facebook.fresco.ui.common.OnFadeListener
 import com.facebook.fresco.ui.common.VitoUtils.generateIdentifier
+import com.facebook.fresco.urimod.asDimensions
 import com.facebook.fresco.vito.core.FrescoController2
 import com.facebook.fresco.vito.core.FrescoDrawableInterface
 import com.facebook.fresco.vito.core.FrescoVitoConfig
@@ -231,7 +232,11 @@ open class FrescoController2Impl(
       }
       val dataSource =
           imagePipeline.fetchDecodedImage(
-              imageRequest, callerContext, drawable.imageOriginListener, imageId)
+              imageRequest,
+              callerContext,
+              drawable.imageOriginListener,
+              imageId,
+              viewportDimensions?.asDimensions())
       drawable.setDataSource(imageId, dataSource)
       dataSource.subscribe(drawable, uiThreadExecutor)
     }
@@ -462,13 +467,14 @@ open class FrescoController2Impl(
               dataSource?.extras,
               imageSourceExtras,
               drawable.viewportDimensions,
-              drawable.actualImageScaleType.toString(),
+              drawable.actualImageScaleType,
               drawable.actualImageFocusPoint,
               imageExtras,
               drawable.callerContext,
               logWithHighSamplingRate,
               sourceUri)
-      extras.modifiedUriStatus = imageRequest.extras[HasExtraData.KEY_MODIFIED_URL] as? String
+      extras.smartUrlFetchStrategy = imageRequest.extras[HasExtraData.KEY_SF_FETCH_STRATEGY]
+      extras.smartUrlModificationResult = imageRequest.extras[HasExtraData.KEY_SF_MOD_RESULT]
       extras.originalUri = imageRequest.extras[HasExtraData.KEY_ORIGINAL_URL] as? Uri
       extras.uiFramework = drawable.uiFramework
       return extras

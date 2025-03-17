@@ -7,9 +7,9 @@
 
 package com.facebook.drawee.drawable;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -188,7 +188,6 @@ public class DrawableTestUtils {
               }
             })
         .when(drawable)
-        // NULLSAFE_FIXME[Not Vetted Third-Party]
         .draw(any(Canvas.class));
   }
 

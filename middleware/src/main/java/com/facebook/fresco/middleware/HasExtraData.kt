@@ -31,10 +31,14 @@ interface HasExtraData {
     const val KEY_BITMAP_CONFIG = "bitmap_config"
     const val KEY_IS_ROUNDED = "is_rounded"
     const val KEY_NON_FATAL_DECODE_ERROR = "non_fatal_decode_error"
+
     /** The original URL if it was modified by Dynamic Image URL */
     const val KEY_ORIGINAL_URL = "original_url"
+
     /** Information on if/why the url was modified by Dynamic Image URL */
-    const val KEY_MODIFIED_URL = "modified_url"
+    const val KEY_SF_FETCH_STRATEGY = "smart_fetch_strategy"
+    const val KEY_SF_MOD_RESULT = "smart_mod_result"
+    const val KEY_SF_ADAPTIVE = "smart_adaptive"
     const val KEY_IMAGE_SOURCE_TYPE: String = "image_source_type"
 
     const val KEY_ORIGIN = "origin"
@@ -42,11 +46,21 @@ interface HasExtraData {
 
     /* number of deduped request in BitmapMemoryCacheKeyMultiplexProducer */
     const val KEY_MULTIPLEX_BITMAP_COUNT = "multiplex_bmp_cnt"
+
     /* number of deduped request in EncodedCacheKeyMultiplexProducer */
     const val KEY_MULTIPLEX_ENCODED_COUNT = "multiplex_enc_cnt"
     const val KEY_LAST_SCAN_NUMBER = "last_scan_num"
+    const val TARGET_SCAN = "target_scan"
 
     const val KEY_IMAGE_SOURCE_EXTRAS = "image_source_extras"
     const val KEY_COLOR_SPACE = "image_color_space"
+
+    const val KEY_VIEWPORT = "viewport"
+    const val KEY_IMAGEOPTIONS = "imageoptions"
+
+    /* HDR related image extra data */
+    const val STORED_IMAGE_HAS_GAIN_MAP = "stored_image_has_gain_map"
+    const val FETCHED_IMAGE_HAS_GAIN_MAP = "fetched_image_has_gain_map"
+    const val IS_HDR = "is_HDR"
   }
 }

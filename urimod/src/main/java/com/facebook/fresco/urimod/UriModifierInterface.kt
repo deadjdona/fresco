@@ -20,10 +20,19 @@ interface UriModifierInterface {
       scaleType: ScaleType?,
       callerContext: Any?,
       contextChain: ContextChain? = null,
-      forLoggingOnly: Boolean = false,
   ): ModificationResult
 
+  fun calculateBestUri(uri: Uri?, viewport: Dimensions?, scaleType: ScaleType?): Uri? = null
+
   fun modifyPrefetchUri(uri: Uri, callerContext: Any?): Uri?
+
+  fun modifyNetworkUriAdaptively(
+      uri: Uri,
+      viewport: Dimensions?,
+      scaleType: ScaleType?,
+      callerContext: Any?,
+      contextChain: ContextChain? = null,
+  ): ModificationResult = ModificationResult.Disabled("Default")
 
   fun unregisterReverseFallbackUri(uri: Uri)
 

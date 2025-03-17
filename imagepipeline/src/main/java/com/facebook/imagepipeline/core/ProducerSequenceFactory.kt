@@ -34,7 +34,6 @@ class ProducerSequenceFactory(
     private val producerFactory: ProducerFactory,
     private val networkFetcher: NetworkFetcher<*>,
     private val resizeAndRotateEnabledForNetwork: Boolean,
-    private val webpSupportEnabled: Boolean,
     private val threadHandoffProducerQueue: ThreadHandoffProducerQueue,
     private val downsampleMode: DownsampleMode,
     private val useBitmapPrepareToDraw: Boolean,
@@ -44,7 +43,8 @@ class ProducerSequenceFactory(
     private val isEncodedMemoryCacheProbingEnabled: Boolean,
     private val isDiskCacheProbingEnabled: Boolean,
     private val allowDelay: Boolean,
-    private val customProducerSequenceFactories: Set<CustomProducerSequenceFactory>?
+    private val customProducerSequenceFactories: Set<CustomProducerSequenceFactory>?,
+    private val localImageThrottlingMaxSimultaneousRequests: Long
 ) {
 
   @VisibleForTesting
@@ -243,7 +243,7 @@ class ProducerSequenceFactory(
               }
             }
             throw IllegalArgumentException(
-                "Unsupported uri scheme! Uri is: " + getShortenedUriString(uri))
+                "Unsupported uri scheme! Uri is: <${getShortenedUriString(uri)}>")
           }
         }
       }
@@ -560,7 +560,9 @@ class ProducerSequenceFactory(
         ProducerFactory.newAddImageTransformMetaDataProducer(inputProducer)
     localImageProducer =
         producerFactory.newResizeAndRotateProducer(localImageProducer, true, imageTranscoderFactory)
-    val localImageThrottlingProducer = producerFactory.newThrottlingProducer(localImageProducer)
+    val localImageThrottlingProducer =
+        producerFactory.newThrottlingProducer(
+            localImageThrottlingMaxSimultaneousRequests, localImageProducer)
     return ProducerFactory.newBranchOnSeparateImagesProducer(
         newLocalThumbnailProducer(thumbnailProducers), localImageThrottlingProducer)
   }

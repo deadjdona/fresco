@@ -36,7 +36,6 @@ import com.facebook.imageutils.BitmapUtil
  */
 class ImagePipelineExperiments private constructor(builder: Builder) {
 
-  val isWebpSupportEnabled: Boolean
   val webpErrorLogger: WebpErrorLogger?
   val isDecodeCancellationEnabled: Boolean
   val webpBitmapFactory: WebpBitmapFactory?
@@ -52,10 +51,10 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
   val isPartialImageCachingEnabled: Boolean
   val producerFactoryMethod: ProducerFactoryMethod
   val isLazyDataSource: Supplier<Boolean>
-  val isGingerbreadDecoderEnabled: Boolean
   val downscaleFrameToDrawableDimensions: Boolean
   val suppressBitmapPrefetchingSupplier: Supplier<Boolean>
   val isExperimentalThreadHandoffQueueEnabled: Boolean
+  val throttlingProducerMaxSimultaneousRequests: Long
   val memoryType: Long
   val keepCancelledFetchAsLowPriority: Boolean
   val downsampleIfLargeBitmap: Boolean
@@ -78,7 +77,6 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
 
   class Builder(private val configBuilder: ImagePipelineConfig.Builder) {
     @JvmField var shouldUseDecodingBufferHelper = false
-    @JvmField var webpSupportEnabled = false
     @JvmField var webpErrorLogger: WebpErrorLogger? = null
     @JvmField var decodeCancellationEnabled = false
     @JvmField var webpBitmapFactory: WebpBitmapFactory? = null
@@ -97,13 +95,13 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
 
     @JvmField var lazyDataSource: Supplier<Boolean>? = null
 
-    @JvmField var gingerbreadDecoderEnabled = false
-
     @JvmField var downscaleFrameToDrawableDimensions = false
 
     @JvmField var suppressBitmapPrefetchingSupplier = Suppliers.of(false)
 
     @JvmField var experimentalThreadHandoffQueueEnabled = false
+
+    @JvmField var throttlingProducerMaxSimultaneousRequests: Long = 5
 
     @JvmField var memoryType: Long = 0
     @JvmField var keepCancelledFetchAsLowPriority = false
@@ -145,10 +143,6 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
 
     fun setIgnoreCacheSizeMismatch(shouldIgnoreCacheSizeMismatch: Boolean) = asBuilder {
       this.shouldIgnoreCacheSizeMismatch = shouldIgnoreCacheSizeMismatch
-    }
-
-    fun setWebpSupportEnabled(webpSupportEnabled: Boolean) = asBuilder {
-      this.webpSupportEnabled = webpSupportEnabled
     }
 
     fun setPrefetchShortcutEnabled(prefetchShortcutEnabled: Boolean) = asBuilder {
@@ -259,10 +253,6 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
       this.lazyDataSource = lazyDataSource
     }
 
-    fun setGingerbreadDecoderEnabled(gingerbreadDecoderEnabled: Boolean) = asBuilder {
-      this.gingerbreadDecoderEnabled = gingerbreadDecoderEnabled
-    }
-
     fun setShouldDownscaleFrameToDrawableDimensions(downscaleFrameToDrawableDimensions: Boolean) =
         asBuilder {
           this.downscaleFrameToDrawableDimensions = downscaleFrameToDrawableDimensions
@@ -277,6 +267,12 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         asBuilder {
           this.experimentalThreadHandoffQueueEnabled = experimentalThreadHandoffQueueEnabled
         }
+
+    fun setThrottlingProducerMaxSimultaneousRequests(maxSimultaneousRequests: Long) = asBuilder {
+      if (maxSimultaneousRequests >= 1) {
+        this.throttlingProducerMaxSimultaneousRequests = maxSimultaneousRequests
+      }
+    }
 
     fun setExperimentalMemoryType(MemoryType: Long) = asBuilder { this.memoryType = MemoryType }
 
@@ -411,7 +407,6 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
   }
 
   init {
-    isWebpSupportEnabled = builder.webpSupportEnabled
     webpErrorLogger = builder.webpErrorLogger
     isDecodeCancellationEnabled = builder.decodeCancellationEnabled
     webpBitmapFactory = builder.webpBitmapFactory
@@ -427,10 +422,10 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
     isPartialImageCachingEnabled = builder.isPartialImageCachingEnabled
     producerFactoryMethod = builder.producerFactoryMethod ?: DefaultProducerFactoryMethod()
     isLazyDataSource = builder.lazyDataSource ?: Suppliers.BOOLEAN_FALSE
-    isGingerbreadDecoderEnabled = builder.gingerbreadDecoderEnabled
     downscaleFrameToDrawableDimensions = builder.downscaleFrameToDrawableDimensions
     suppressBitmapPrefetchingSupplier = builder.suppressBitmapPrefetchingSupplier
     isExperimentalThreadHandoffQueueEnabled = builder.experimentalThreadHandoffQueueEnabled
+    throttlingProducerMaxSimultaneousRequests = builder.throttlingProducerMaxSimultaneousRequests
     memoryType = builder.memoryType
     keepCancelledFetchAsLowPriority = builder.keepCancelledFetchAsLowPriority
     downsampleIfLargeBitmap = builder.downsampleIfLargeBitmap

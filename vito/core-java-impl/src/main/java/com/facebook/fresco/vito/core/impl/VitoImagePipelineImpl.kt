@@ -9,15 +9,21 @@ package com.facebook.fresco.vito.core.impl
 
 import android.content.res.Resources
 import android.graphics.Rect
+import android.os.Looper
 import com.facebook.common.callercontext.ContextChain
 import com.facebook.common.references.CloseableReference
 import com.facebook.datasource.DataSource
 import com.facebook.datasource.DataSources
 import com.facebook.fresco.middleware.HasExtraData
 import com.facebook.fresco.ui.common.VitoUtils
+import com.facebook.fresco.urimod.ClassicFetchStrategy
 import com.facebook.fresco.urimod.Dimensions
+import com.facebook.fresco.urimod.FetchStrategy
+import com.facebook.fresco.urimod.NoPrefetchInOnPrepareStrategy
+import com.facebook.fresco.urimod.SmartFetchStrategy
 import com.facebook.fresco.urimod.UriModifier
 import com.facebook.fresco.urimod.UriModifierInterface
+import com.facebook.fresco.urimod.asDimensions
 import com.facebook.fresco.vito.core.FrescoVitoConfig
 import com.facebook.fresco.vito.core.ImagePipelineUtils
 import com.facebook.fresco.vito.core.VitoImagePipeline
@@ -55,42 +61,48 @@ class VitoImagePipelineImpl(
       viewport: Rect?,
       callerContext: Any?,
       contextChain: ContextChain?,
-      forceKeepOriginalSize: Boolean,
-      forLoggingOnly: Boolean,
+      fetchStrategy: FetchStrategy?,
   ): VitoImageRequest {
     val imageOptions = options ?: defaults()
     val extras: MutableMap<String, Any> = mutableMapOf()
     var finalImageSource = imageSource
 
-    val modifiedUriValue: String
-    if (experimentalDynamicSizeVito2() && !forceKeepOriginalSize) {
-      if (imageSource is UriImageSource) {
-        val result: UriModifierInterface.ModificationResult =
-            UriModifier.INSTANCE.modifyUri(
-                imageSource,
-                viewport?.let { Dimensions(it.width(), it.height()) },
-                imageOptions.actualImageScaleType,
-                callerContext,
-                contextChain,
-                forLoggingOnly)
-        modifiedUriValue = result.toString()
-        if (result is UriModifierInterface.ModificationResult.Modified) {
-          finalImageSource = ImageSourceProvider.forUri(result.newUri)
-          extras[HasExtraData.KEY_ORIGINAL_URL] = imageSource.imageUri
+    val modifiedUriValue: String?
+    when (fetchStrategy) {
+      is SmartFetchStrategy -> {
+        if (imageSource is UriImageSource) {
+          val result: UriModifierInterface.ModificationResult =
+              UriModifier.INSTANCE.modifyUri(
+                  imageSource,
+                  viewport?.let { Dimensions(it.width(), it.height()) },
+                  imageOptions.actualImageScaleType,
+                  callerContext,
+                  contextChain)
+          modifiedUriValue = result.toString()
+          if (result is UriModifierInterface.ModificationResult.Modified) {
+            finalImageSource = ImageSourceProvider.forUri(result.newUri)
+            extras[HasExtraData.KEY_ORIGINAL_URL] = imageSource.imageUri
+          }
+        } else {
+          modifiedUriValue = "NotSupportedImageSource: ${imageSource.getClassNameString()}"
         }
-      } else {
-        modifiedUriValue = "NotSupportedImageSource: ${imageSource.getClassNameString()}"
       }
-    } else if (experimentalDynamicSizeVito2() &&
-        experimentalDynamicSizeWithCacheFallbackVito2() &&
-        forceKeepOriginalSize) {
-      modifiedUriValue = "MBPDiskFallbackEnabled"
-    } else {
-      modifiedUriValue =
-          "Disabled(exp=${experimentalDynamicSizeVito2()}, fallback=${experimentalDynamicSizeWithCacheFallbackVito2()}, force=${forceKeepOriginalSize})"
+
+      is ClassicFetchStrategy -> {
+        modifiedUriValue = "classic" // FIXME: no smart fetch
+      }
+
+      is NoPrefetchInOnPrepareStrategy -> {
+        modifiedUriValue = "noprefetch" // probably should be null (and above) FIXME
+      }
+
+      null -> {
+        modifiedUriValue = null
+      }
     }
 
-    extras[HasExtraData.KEY_MODIFIED_URL] = modifiedUriValue
+    fetchStrategy?.let { extras[HasExtraData.KEY_SF_FETCH_STRATEGY] = it }
+    modifiedUriValue?.let { extras[HasExtraData.KEY_SF_MOD_RESULT] = it }
     extras[HasExtraData.KEY_IMAGE_SOURCE_TYPE] = imageSource.getClassNameString()
 
     if (imageSource is IncreasingQualityImageSource) {
@@ -111,7 +123,8 @@ class VitoImagePipelineImpl(
         logWithHighSamplingRate,
         finalImageRequest,
         finalImageCacheKey,
-        extras)
+        extras,
+        viewport = viewport?.asDimensions())
   }
 
   override fun getCachedImage(imageRequest: VitoImageRequest): CloseableReference<CloseableImage>? =
@@ -128,7 +141,8 @@ class VitoImagePipelineImpl(
       imageRequest: VitoImageRequest,
       callerContext: Any?,
       requestListener: RequestListener?,
-      uiComponentId: Long
+      uiComponentId: Long,
+      viewport: Dimensions?,
   ): DataSource<CloseableReference<CloseableImage>> =
       ImageSourceToImagePipelineAdapter.createDataSourceSupplier(
               imageRequest.imageSource,
@@ -138,7 +152,9 @@ class VitoImagePipelineImpl(
               callerContext,
               requestListener,
               VitoUtils.getStringId(uiComponentId),
-              imageRequest.extras)
+              imageRequest.extras,
+              viewport,
+          )
           .get()
 
   override fun isInDiskCacheSync(
@@ -193,5 +209,79 @@ class VitoImagePipelineImpl(
       is UriImageSource -> "UriImageSource"
       else -> "Other"
     }
+  }
+
+  override fun determineFetchStrategy(
+      requestBeforeLayout: VitoImageRequest?,
+      callerContext: Any?,
+      contextChain: ContextChain?
+  ): FetchStrategy {
+    if (requestBeforeLayout == null) {
+      if (experimentalDynamicSizeVito2()) {
+        return SmartFetchStrategy.DEFAULT
+      } else {
+        return NoPrefetchInOnPrepareStrategy
+      }
+    }
+
+    if (!experimentalDynamicSizeVito2()) {
+      return ClassicFetchStrategy.APP_DISABLED
+    }
+
+    if (experimentalDynamicSizeWithCacheFallbackVito2() &&
+        Looper.myLooper() == Looper.getMainLooper()) {
+      // We don't want to check cache if we are running on the main thread
+      // By default uses the original URL
+      val shouldSmartFetchOnMainThread = config.experimentalDynamicSizeOnPrepareMainThreadVito2()
+      if (shouldSmartFetchOnMainThread) {
+        return SmartFetchStrategy.MAIN_THREAD
+      } else {
+        return ClassicFetchStrategy.MAIN_THREAD
+      }
+    }
+
+    if (isProductEnabled(callerContext, contextChain) == false) {
+      return ClassicFetchStrategy.PRODUCT_DISABLED
+    }
+
+    if (config.experimentalDynamicSizeDisableWhenAppIsStarting() && config.isAppStarting()) {
+      return ClassicFetchStrategy.APP_STARTING
+    }
+
+    if (experimentalDynamicSizeWithCacheFallbackVito2()) {
+      if (config.experimentalDynamicSizeBloksDisableDiskCacheCheck() &&
+          config.isCallerContextBloks(callerContext)) {
+        return SmartFetchStrategy.DEFAULT
+      }
+
+      val isInDiskCache =
+          isInDiskCacheSync(
+              requestBeforeLayout,
+              config.experimentalDynamicSizeDiskCacheCheckTimeoutMs(),
+              TimeUnit.MILLISECONDS)
+
+      if (isInDiskCache == null) {
+        // Disk cache request timed out
+        if (config.experimentalDynamicSizeUseSfOnDiskCacheTimeout()) {
+          return SmartFetchStrategy.DISK_CACHE_TIMEOUT
+        } else {
+          return ClassicFetchStrategy.DISK_CACHE_TIMEOUT
+        }
+      }
+
+      if (isInDiskCache) {
+        // Disk MBP fallback
+        return ClassicFetchStrategy.DISK_CACHE_HIT
+      }
+    }
+
+    return SmartFetchStrategy.DEFAULT
+  }
+
+  private fun isProductEnabled(callerContext: Any?, contextChain: ContextChain?): Boolean? {
+    if (!config.experimentalDynamicSizeCheckIfProductIsEnabled()) {
+      return null
+    }
+    return config.experimentalDynamicSizeIsProductEnabled(callerContext, contextChain)
   }
 }

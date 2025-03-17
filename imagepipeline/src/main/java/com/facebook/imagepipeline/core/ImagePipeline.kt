@@ -630,6 +630,26 @@ class ImagePipeline(
     encodedMemoryCache.removeAll(allPredicate)
   }
 
+  /**
+   * Clear a specific disk cache. For dynamic disk caches, if a diskCacheId is not specified, all
+   * the dynamic disk caches registered, will be cleared.
+   */
+  fun clearSpecificDiskCache(cacheChoice: CacheChoice, diskCacheId: String?) {
+    val diskCachesStore = diskCachesStoreSupplier.get()
+    if (cacheChoice == CacheChoice.SMALL) {
+      diskCachesStore.smallImageBufferedDiskCache.clearAll()
+    } else if (cacheChoice == CacheChoice.DEFAULT) {
+      diskCachesStore.mainBufferedDiskCache.clearAll()
+    } else if (cacheChoice == CacheChoice.DYNAMIC) {
+      if (diskCacheId == null) {
+        diskCachesStore.dynamicBufferedDiskCaches.forEach { it.value.clearAll() }
+      } else {
+        val specifiedDiskCache = diskCachesStore.dynamicBufferedDiskCaches[diskCacheId]
+        specifiedDiskCache?.clearAll()
+      }
+    }
+  }
+
   /** Clear disk caches */
   fun clearDiskCaches() {
     val diskCachesStore = diskCachesStoreSupplier.get()
@@ -987,43 +1007,6 @@ class ImagePipeline(
                   imageRequest.priority,
                   config)
           settableProducerContext.putExtras(extras)
-          CloseableProducerToDataSourceAdapter.create(
-              producerSequence, settableProducerContext, requestListener2)
-        } catch (exception: Exception) {
-          DataSources.immediateFailedDataSource(exception)
-        }
-      }
-
-  private fun <T> submitFetchRequest(
-      producerSequence: Producer<CloseableReference<T>>,
-      imageRequest: ImageRequest,
-      lowestPermittedRequestLevelOnSubmit: RequestLevel,
-      callerContext: Any?,
-      requestListener: RequestListener?,
-      extras: Map<String, *>?
-  ): DataSource<CloseableReference<T>> =
-      traceSection("ImagePipeline#submitFetchRequest") {
-        val requestListener2 =
-            InternalRequestListener(
-                getRequestListenerForRequest(imageRequest, requestListener), requestListener2)
-        callerContextVerifier?.verifyCallerContext(callerContext, false)
-        return try {
-          val lowestPermittedRequestLevel =
-              RequestLevel.getMax(
-                  imageRequest.lowestPermittedRequestLevel, lowestPermittedRequestLevelOnSubmit)
-          val settableProducerContext =
-              SettableProducerContext(
-                  imageRequest,
-                  generateUniqueFutureId(),
-                  null,
-                  requestListener2,
-                  callerContext,
-                  lowestPermittedRequestLevel, /* isPrefetch */
-                  false,
-                  imageRequest.progressiveRenderingEnabled ||
-                      !UriUtil.isNetworkUri(imageRequest.sourceUri),
-                  imageRequest.priority,
-                  config)
           CloseableProducerToDataSourceAdapter.create(
               producerSequence, settableProducerContext, requestListener2)
         } catch (exception: Exception) {

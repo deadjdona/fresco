@@ -13,8 +13,10 @@ import com.facebook.datasource.DataSource
 import com.facebook.datasource.DataSources
 import com.facebook.datasource.FirstAvailableDataSourceSupplier
 import com.facebook.datasource.IncreasingQualityDataSourceSupplier
-import com.facebook.fresco.middleware.Extras
+import com.facebook.fresco.middleware.HasExtraData
+import com.facebook.fresco.urimod.Dimensions
 import com.facebook.fresco.vito.core.ImagePipelineUtils
+import com.facebook.fresco.vito.core.impl.source.DataSourceImageSource
 import com.facebook.fresco.vito.core.impl.source.ImagePipelineImageSource
 import com.facebook.fresco.vito.options.ImageOptions
 import com.facebook.fresco.vito.source.EmptyImageSource
@@ -59,10 +61,13 @@ object ImageSourceToImagePipelineAdapter {
       is EmptyImageSource -> null
       is FirstAvailableImageSource ->
           imageSource.extractFirstAvailableRequest(imagePipelineUtils, imageOptions)
+
       is IncreasingQualityImageSource ->
           maybeExtractFinalImageRequest(imageSource.highResSource, imagePipelineUtils, imageOptions)
+
       is ImagePipelineImageSource ->
           imageSource.maybeExtractFinalImageRequest(imagePipelineUtils, imageOptions)
+
       else -> null
     }
   }
@@ -76,7 +81,8 @@ object ImageSourceToImagePipelineAdapter {
       callerContext: Any?,
       requestListener: RequestListener?,
       uiComponentId: String,
-      extras: MutableMap<String, Any>
+      extras: MutableMap<String, Any>,
+      viewport: Dimensions?,
   ): Supplier<DataSource<CloseableReference<CloseableImage>>> {
     return when (imageSource) {
       is SingleImageSource -> {
@@ -89,9 +95,12 @@ object ImageSourceToImagePipelineAdapter {
               requestListener,
               uiComponentId,
               ImageRequest.RequestLevel.FULL_FETCH,
-              extras)
+              extras,
+              viewport,
+              imageOptions)
         }
       }
+
       is ImagePipelineImageSource -> {
         return Supplier<DataSource<CloseableReference<CloseableImage>>> {
           val imageRequest =
@@ -103,9 +112,12 @@ object ImageSourceToImagePipelineAdapter {
               requestListener,
               uiComponentId,
               imageSource.getRequestLevelForFetch(),
-              extras)
+              extras,
+              viewport,
+              imageOptions)
         }
       }
+
       is EmptyImageSource -> NO_REQUEST_SUPPLIER
       is FirstAvailableImageSource ->
           FirstAvailableDataSourceSupplier.create(
@@ -118,8 +130,10 @@ object ImageSourceToImagePipelineAdapter {
                     callerContext,
                     requestListener,
                     uiComponentId,
-                    extras)
+                    extras,
+                    viewport)
               })
+
       is IncreasingQualityImageSource ->
           return IncreasingQualityDataSourceSupplier.create(
               arrayListOf(
@@ -131,7 +145,8 @@ object ImageSourceToImagePipelineAdapter {
                       callerContext,
                       requestListener,
                       uiComponentId,
-                      extras),
+                      extras,
+                      viewport),
                   createDataSourceSupplier(
                       imageSource.lowResSource,
                       imagePipeline,
@@ -140,7 +155,10 @@ object ImageSourceToImagePipelineAdapter {
                       callerContext,
                       requestListener,
                       uiComponentId,
-                      extras)))
+                      extras,
+                      viewport)))
+
+      is DataSourceImageSource -> imageSource.dataSourceSupplier
       else -> NO_REQUEST_SUPPLIER
     }
   }
@@ -153,8 +171,14 @@ object ImageSourceToImagePipelineAdapter {
       requestListener: RequestListener?,
       uiComponentId: String,
       requestLevel: ImageRequest.RequestLevel = ImageRequest.RequestLevel.FULL_FETCH,
-      extras: Extras
+      extras: MutableMap<String, Any>,
+      viewport: Dimensions?,
+      imageOptions: ImageOptions,
   ): DataSource<CloseableReference<CloseableImage>> {
+    if (viewport != null) {
+      extras[HasExtraData.KEY_VIEWPORT] = viewport
+    }
+    extras[HasExtraData.KEY_IMAGEOPTIONS] = imageOptions
     return if (imageRequest != null) {
       imagePipeline.fetchDecodedImage(
           imageRequest,

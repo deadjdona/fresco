@@ -19,6 +19,7 @@ import androidx.preference.CheckBoxPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
+import com.facebook.common.preconditions.Preconditions;
 import com.facebook.infer.annotation.Nullsafe;
 import com.facebook.samples.scrollperf.R;
 import com.facebook.samples.scrollperf.conf.Const;
@@ -44,8 +45,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
   @Override
   public void onCreatePreferences(Bundle bundle, String s) {
     addPreferencesFromResource(R.xml.preferences);
-    // NULLSAFE_FIXME[Not Vetted Third-Party, Nullable Dereference]
-    getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
+    // NULLSAFE_FIXME[Not Vetted Third-Party]
+    Preconditions.checkNotNull(getPreferenceManager().getSharedPreferences())
+        .registerOnSharedPreferenceChangeListener(this);
     // Update summaries
     // NULLSAFE_FIXME[Parameter Not Nullable]
     updateDataSourceSummary(findPreference(Const.DATA_SOURCE_KEY));
@@ -83,12 +85,10 @@ public class SettingsFragment extends PreferenceFragmentCompat
     updateNumberOfDecodingThreadSummary(findPreference(Const.DECODING_THREAD_KEY));
     // Set sizes
     SizePreferences widthPreferences = (SizePreferences) findPreference(Const.OVERRIDEN_WIDTH_KEY);
-    // NULLSAFE_FIXME[Nullable Dereference]
-    widthPreferences.setSeekBarMaxValue(SizeUtil.DISPLAY_WIDTH);
+    Preconditions.checkNotNull(widthPreferences).setSeekBarMaxValue(SizeUtil.DISPLAY_WIDTH);
     SizePreferences heightPreferences =
         (SizePreferences) findPreference(Const.OVERRIDEN_HEIGHT_KEY);
-    // NULLSAFE_FIXME[Nullable Dereference]
-    heightPreferences.setSeekBarMaxValue(SizeUtil.DISPLAY_HEIGHT);
+    Preconditions.checkNotNull(heightPreferences).setSeekBarMaxValue(SizeUtil.DISPLAY_HEIGHT);
     // NULLSAFE_FIXME[Parameter Not Nullable]
     updateFadeDurationSummary(findPreference(Const.FADE_DURATION_KEY));
     // NULLSAFE_FIXME[Parameter Not Nullable]
@@ -102,8 +102,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
   @Override
   public void onDestroy() {
     super.onDestroy();
-    // NULLSAFE_FIXME[Nullable Dereference, Not Vetted Third-Party]
-    getPreferenceManager().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(this);
+    // NULLSAFE_FIXME[Not Vetted Third-Party]
+    Preconditions.checkNotNull(getPreferenceManager().getSharedPreferences())
+        .unregisterOnSharedPreferenceChangeListener(this);
   }
 
   @Override
