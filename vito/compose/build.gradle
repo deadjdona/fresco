@@ -53,7 +53,7 @@ dependencies {
     implementation project(':ui-common')
 
     // Specify the Compose BOM with a version definition
-    Dependency composeBom = platform('androidx.compose:compose-bom:2025.03.00')
+    Dependency composeBom = platform('androidx.compose:compose-bom:2025.09.01')
     implementation composeBom
     testImplementation composeBom
     androidTestImplementation composeBom
