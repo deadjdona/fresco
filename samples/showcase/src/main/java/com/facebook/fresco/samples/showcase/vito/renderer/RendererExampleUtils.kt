@@ -32,13 +32,15 @@ fun createSampleBitmap(w: Int, h: Int, blue: Int = 0) =
 
 fun LinearLayout.createLinearLayout(
     isHorizontal: Boolean = false,
-    block: LinearLayout.() -> Unit
+    block: LinearLayout.() -> Unit,
 ): LinearLayout {
   return LinearLayout(context).apply {
     this.orientation = if (isHorizontal) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
     layoutParams =
         LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
     block()
   }
 }
@@ -48,7 +50,7 @@ fun LinearLayout.addImageViewWithText(
     w: Int,
     h: Int,
     padding: Int = 0,
-    block: ImageView.() -> Unit
+    block: ImageView.() -> Unit,
 ): LinearLayout {
   val ll = createLinearLayout {
     addText(title)
@@ -76,7 +78,7 @@ fun LinearLayout.addImageView(w: Int, h: Int, padding: Int = 0): ImageView {
 fun LinearLayout.addRow(
     text: String? = null,
     scrollHorizontally: Boolean = false,
-    block: LinearLayout.() -> Unit
+    block: LinearLayout.() -> Unit,
 ) {
   addText(text)
   addView(
@@ -84,12 +86,15 @@ fun LinearLayout.addRow(
         HorizontalScrollView(context).apply {
           layoutParams =
               LinearLayout.LayoutParams(
-                  ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                  ViewGroup.LayoutParams.MATCH_PARENT,
+                  ViewGroup.LayoutParams.WRAP_CONTENT,
+              )
           addView(createLinearLayout(true, block))
         }
       } else {
         createLinearLayout(true, block)
-      })
+      }
+  )
 }
 
 fun LinearLayout.addExample(
@@ -102,7 +107,8 @@ fun LinearLayout.addExample(
 ) {
   addImageView(w, h)
       .setImageDrawable(
-          RendererExampleDrawable(imageDataModel, shape, transformationMatrix, colorFilter))
+          RendererExampleDrawable(imageDataModel, shape, transformationMatrix, colorFilter)
+      )
 }
 
 fun LinearLayout.addText(text: String?) {
@@ -113,8 +119,11 @@ fun LinearLayout.addText(text: String?) {
           this.text = text
           layoutParams =
               LinearLayout.LayoutParams(
-                  ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                  ViewGroup.LayoutParams.MATCH_PARENT,
+                  ViewGroup.LayoutParams.WRAP_CONTENT,
+              )
           setPadding(padding, padding, padding, padding)
-        })
+        }
+    )
   }
 }

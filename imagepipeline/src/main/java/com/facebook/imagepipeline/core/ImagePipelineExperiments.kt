@@ -74,6 +74,15 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
   val prefetchShortcutEnabled: Boolean
   val platformDecoderOptions: PlatformDecoderOptions
   val isBinaryXmlEnabled: Boolean
+  val loadThumbnailFromContentResolverFirst: Boolean
+  val loadThumbnailFromContentResolverForContentUriOnly: Boolean
+  val preserveMetadataOnDisk: Boolean
+  val preserveMetadataOnDiskDuringStartup: Boolean
+  val intermediateProgressUpdatesDisabled: Boolean
+  val intermediateProgressUpdatesForPrefetchDisabled: Boolean
+  val throwCacheMissExceptionOnCacheMiss: Boolean
+  val usePostProcessedCacheKey: Boolean
+  val usePostprocessorDuringDecodedPrefetch: Boolean
 
   class Builder(private val configBuilder: ImagePipelineConfig.Builder) {
     @JvmField var shouldUseDecodingBufferHelper = false
@@ -127,6 +136,21 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
     @JvmField var platformDecoderOptions = PlatformDecoderOptions()
 
     @JvmField var isBinaryXmlEnabled = false
+
+    @JvmField var loadThumbnailFromContentResolverFirst = false
+    @JvmField var loadThumbnailFromContentResolverForContentUriOnly = false
+
+    @JvmField var preserveMetadataOnDisk = false
+    @JvmField var preserveMetadataOnDiskDuringStartup = false
+
+    @JvmField var intermediateProgressUpdatesDisabled = false
+    @JvmField var intermediateProgressUpdatesForPrefetchDisabled = false
+
+    @JvmField var throwCacheMissExceptionOnCacheMiss = false
+
+    @JvmField var usePostProcessedCacheKey = false
+
+    @JvmField var usePostprocessorDuringDecodedPrefetch = false
 
     private fun asBuilder(block: () -> Unit): Builder {
       block()
@@ -203,7 +227,7 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         useBitmapPrepareToDraw: Boolean,
         minBitmapSizeBytes: Int,
         maxBitmapSizeBytes: Int,
-        preparePrefetch: Boolean
+        preparePrefetch: Boolean,
     ) = asBuilder {
       this.useBitmapPrepareToDraw = useBitmapPrepareToDraw
       this.bitmapPrepareToDrawMinSizeBytes = minBitmapSizeBytes
@@ -248,7 +272,7 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
       this.producerFactoryMethod = producerFactoryMethod
     }
 
-    /** Stores an alternative lazy method to instantiate the data souce. */
+    /** Stores an alternative lazy method to instantiate the data source. */
     fun setLazyDataSource(lazyDataSource: Supplier<Boolean>?) = asBuilder {
       this.lazyDataSource = lazyDataSource
     }
@@ -327,6 +351,47 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
       isBinaryXmlEnabled = binaryXmlEnabled
     }
 
+    fun setLoadThumbnailFromContentResolverFirst(loadThumbnailFromContentResolverFirst: Boolean) =
+        asBuilder {
+          this.loadThumbnailFromContentResolverFirst = loadThumbnailFromContentResolverFirst
+        }
+
+    fun setLoadThumbnailFromContentResolverForContentUriOnly(
+        loadThumbnailFromContentResolverForContentUriOnly: Boolean
+    ) = asBuilder {
+      this.loadThumbnailFromContentResolverForContentUriOnly =
+          loadThumbnailFromContentResolverForContentUriOnly
+    }
+
+    fun setPreserveMetadataOnDisk(preserve: Boolean) = asBuilder {
+      this.preserveMetadataOnDisk = preserve
+    }
+
+    fun setPreserveMetadataOnDiskDuringStartup(preserve: Boolean) = asBuilder {
+      this.preserveMetadataOnDiskDuringStartup = preserve
+    }
+
+    fun setIntermediateProgressUpdatesDisabled(updatesDisabled: Boolean) = asBuilder {
+      this.intermediateProgressUpdatesDisabled = updatesDisabled
+    }
+
+    fun setIntermediateProgressUpdatesForPrefetchDisabled(updatesDisabled: Boolean) = asBuilder {
+      this.intermediateProgressUpdatesForPrefetchDisabled = updatesDisabled
+    }
+
+    fun setThrowCacheMissExceptionOnCacheMiss(throwException: Boolean) = asBuilder {
+      this.throwCacheMissExceptionOnCacheMiss = throwException
+    }
+
+    fun setUsePostProcessedCacheKey(usePostProcessedCacheKey: Boolean) = asBuilder {
+      this.usePostProcessedCacheKey = usePostProcessedCacheKey
+    }
+
+    fun setUsePostprocessorDuringDecodedPrefetch(usePostprocessorDuringDecodedPrefetch: Boolean) =
+        asBuilder {
+          this.usePostprocessorDuringDecodedPrefetch = usePostprocessorDuringDecodedPrefetch
+        }
+
     fun build(): ImagePipelineExperiments = ImagePipelineExperiments(this)
   }
 
@@ -342,8 +407,8 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         executorSupplier: ExecutorSupplier,
         pooledByteBufferFactory: PooledByteBufferFactory,
         pooledByteStreams: PooledByteStreams,
-        bitmapMemoryCache: MemoryCache<CacheKey?, CloseableImage?>,
-        encodedMemoryCache: MemoryCache<CacheKey?, PooledByteBuffer?>,
+        bitmapMemoryCache: MemoryCache<CacheKey, CloseableImage>,
+        encodedMemoryCache: MemoryCache<CacheKey, PooledByteBuffer>,
         diskCachesStoreSupplier: Supplier<DiskCachesStore>,
         cacheKeyFactory: CacheKeyFactory,
         platformBitmapFactory: PlatformBitmapFactory,
@@ -353,7 +418,8 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         maxBitmapSize: Int,
         closeableReferenceFactory: CloseableReferenceFactory,
         keepCancelledFetchAsLowPriority: Boolean,
-        trackedKeysSize: Int
+        trackedKeysSize: Int,
+        config: ImagePipelineConfigInterface,
     ): ProducerFactory
   }
 
@@ -369,8 +435,8 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         executorSupplier: ExecutorSupplier,
         pooledByteBufferFactory: PooledByteBufferFactory,
         pooledByteStreams: PooledByteStreams,
-        bitmapMemoryCache: MemoryCache<CacheKey?, CloseableImage?>,
-        encodedMemoryCache: MemoryCache<CacheKey?, PooledByteBuffer?>,
+        bitmapMemoryCache: MemoryCache<CacheKey, CloseableImage>,
+        encodedMemoryCache: MemoryCache<CacheKey, PooledByteBuffer>,
         diskCachesStoreSupplier: Supplier<DiskCachesStore>,
         cacheKeyFactory: CacheKeyFactory,
         platformBitmapFactory: PlatformBitmapFactory,
@@ -380,30 +446,33 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
         maxBitmapSize: Int,
         closeableReferenceFactory: CloseableReferenceFactory,
         keepCancelledFetchAsLowPriority: Boolean,
-        trackedKeysSize: Int
+        trackedKeysSize: Int,
+        config: ImagePipelineConfigInterface,
     ): ProducerFactory =
         ProducerFactory(
-            context!!,
-            byteArrayPool!!,
-            imageDecoder!!,
-            progressiveJpegConfig!!,
+            context,
+            byteArrayPool,
+            imageDecoder,
+            progressiveJpegConfig,
             downsampleMode,
             resizeAndRotateEnabledForNetwork,
             decodeCancellationEnabled,
-            executorSupplier!!,
-            pooledByteBufferFactory!!,
-            bitmapMemoryCache!!,
-            encodedMemoryCache!!,
+            executorSupplier,
+            pooledByteBufferFactory,
+            bitmapMemoryCache,
+            encodedMemoryCache,
             diskCachesStoreSupplier,
-            cacheKeyFactory!!,
-            platformBitmapFactory!!,
+            cacheKeyFactory,
+            platformBitmapFactory,
             bitmapPrepareToDrawMinSizeBytes,
             bitmapPrepareToDrawMaxSizeBytes,
             bitmapPrepareToDrawForPrefetch,
             maxBitmapSize,
-            closeableReferenceFactory!!,
+            closeableReferenceFactory,
             keepCancelledFetchAsLowPriority,
-            trackedKeysSize)
+            trackedKeysSize,
+            config,
+        )
   }
 
   init {
@@ -445,6 +514,17 @@ class ImagePipelineExperiments private constructor(builder: Builder) {
     prefetchShortcutEnabled = builder.prefetchShortcutEnabled
     platformDecoderOptions = builder.platformDecoderOptions
     isBinaryXmlEnabled = builder.isBinaryXmlEnabled
+    loadThumbnailFromContentResolverFirst = builder.loadThumbnailFromContentResolverFirst
+    loadThumbnailFromContentResolverForContentUriOnly =
+        builder.loadThumbnailFromContentResolverForContentUriOnly
+    preserveMetadataOnDisk = builder.preserveMetadataOnDisk
+    preserveMetadataOnDiskDuringStartup = builder.preserveMetadataOnDiskDuringStartup
+    intermediateProgressUpdatesDisabled = builder.intermediateProgressUpdatesDisabled
+    intermediateProgressUpdatesForPrefetchDisabled =
+        builder.intermediateProgressUpdatesForPrefetchDisabled
+    throwCacheMissExceptionOnCacheMiss = builder.throwCacheMissExceptionOnCacheMiss
+    usePostProcessedCacheKey = builder.usePostProcessedCacheKey
+    usePostprocessorDuringDecodedPrefetch = builder.usePostprocessorDuringDecodedPrefetch
   }
 
   companion object {

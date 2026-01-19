@@ -35,7 +35,12 @@ object IterativeBoxBlurFilter {
    *   [RenderScriptBlurFilter.BLUR_MAX_RADIUS]
    */
   @JvmStatic
-  fun boxBlurBitmapInPlace(bitmap: Bitmap, iterations: Int, radius: Int) {
+  fun boxBlurBitmapInPlace(
+      bitmap: Bitmap,
+      iterations: Int,
+      radius: Int,
+      ntscDampeningFactor: Float = 0f,
+  ) {
     checkNotNull(bitmap)
     Preconditions.checkArgument(bitmap.isMutable)
     Preconditions.checkArgument(bitmap.height <= BitmapUtil.MAX_BITMAP_DIMENSION)
@@ -43,7 +48,7 @@ object IterativeBoxBlurFilter {
     Preconditions.checkArgument(radius > 0 && radius <= RenderScriptBlurFilter.BLUR_MAX_RADIUS)
     Preconditions.checkArgument(iterations > 0)
     try {
-      fastBoxBlur(bitmap, iterations, radius)
+      fastBoxBlur(bitmap, iterations, radius, ntscDampeningFactor)
     } catch (oom: OutOfMemoryError) {
       FLog.e(
           TAG,
@@ -53,12 +58,19 @@ object IterativeBoxBlurFilter {
               iterations,
               bitmap.width,
               bitmap.height,
-              radius))
+              radius,
+          ),
+      )
       throw oom
     }
   }
 
-  private fun fastBoxBlur(bitmap: Bitmap, iterations: Int, radius: Int) {
+  private fun fastBoxBlur(
+      bitmap: Bitmap,
+      iterations: Int,
+      radius: Int,
+      ntscDampeningFactor: Float,
+  ) {
     val w = bitmap.width
     val h = bitmap.height
     val pixels = IntArray(w * h)
@@ -96,6 +108,14 @@ object IterativeBoxBlurFilter {
         }
       }
     }
+
+    // NTSC Dampening Postprocessing for removing higher frequencies
+    if (ntscDampeningFactor > 0f) {
+      pixels.indices.toList().parallelStream().forEach { i ->
+        pixels[i] = NTSCDampeningFilterUtil.process(pixels[i], ntscDampeningFactor)
+      }
+    }
+
     bitmap.setPixels(pixels, 0, w, 0, 0, w, h)
   }
 
@@ -113,7 +133,7 @@ object IterativeBoxBlurFilter {
       w: Int,
       row: Int,
       diameter: Int,
-      div: IntArray
+      div: IntArray,
   ) {
     val firstInByte = w * row
     val lastInByte = w * (row + 1) - 1
@@ -161,7 +181,7 @@ object IterativeBoxBlurFilter {
       h: Int,
       col: Int,
       diameter: Int,
-      div: IntArray
+      div: IntArray,
   ) {
     val lastInByte = w * (h - 1) + col
     val radiusTimesW = (diameter shr 1) * w

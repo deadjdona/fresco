@@ -13,8 +13,10 @@ import bolts.Task;
 import com.facebook.cache.common.CacheKey;
 import com.facebook.common.internal.ImmutableMap;
 import com.facebook.common.internal.Supplier;
+import com.facebook.fresco.middleware.HasExtraData;
 import com.facebook.imagepipeline.cache.BufferedDiskCache;
 import com.facebook.imagepipeline.cache.CacheKeyFactory;
+import com.facebook.imagepipeline.common.BytesRange;
 import com.facebook.imagepipeline.core.DiskCachesStore;
 import com.facebook.imagepipeline.image.EncodedImage;
 import com.facebook.imagepipeline.request.ImageRequest;
@@ -102,6 +104,15 @@ public class DiskCacheReadProducer implements Producer<EncodedImage> {
     subscribeTaskForRequestCancellation(isCancelled, producerContext);
   }
 
+  public static boolean shouldSkipPartialEncodedImage(
+      EncodedImage cachedReference, ImageRequest request) {
+    if (!request.getSkipEncodedPartialImagesInCachesNotInRequestRange()) {
+      return false;
+    }
+    BytesRange availableBytesRange = BytesRange.toMax(cachedReference.getSize() - 1);
+    return !availableBytesRange.contains(request.getBytesRange());
+  }
+
   private Continuation<EncodedImage, Void> onFinishDiskReads(
       final Consumer<EncodedImage> consumer, final ProducerContext producerContext) {
     final ProducerListener2 listener = producerContext.getProducerListener();
@@ -118,19 +129,31 @@ public class DiskCacheReadProducer implements Producer<EncodedImage> {
           mInputProducer.produceResults(consumer, producerContext);
         } else {
           EncodedImage cachedReference = task.getResult();
-          if (cachedReference != null) {
+          ImageRequest request = producerContext.getImageRequest();
+          if (cachedReference != null && !shouldSkipPartialEncodedImage(cachedReference, request)) {
             listener.onProducerFinishWithSuccess(
                 producerContext,
                 PRODUCER_NAME,
                 getExtraMap(listener, producerContext, true, cachedReference.getSize()));
             listener.onUltimateProducerReached(producerContext, PRODUCER_NAME, true);
             producerContext.putOriginExtra("disk");
+            producerContext.putExtra(HasExtraData.KEY_ENCODED_SIZE, cachedReference.getSize());
+            producerContext.putExtra(HasExtraData.KEY_ENCODED_WIDTH, cachedReference.getWidth());
+            producerContext.putExtra(HasExtraData.KEY_ENCODED_HEIGHT, cachedReference.getHeight());
+            producerContext.putExtra(
+                HasExtraData.KEY_SF_QUERY, cachedReference.getExtra(HasExtraData.KEY_SF_QUERY));
             consumer.onProgressUpdate(1);
             consumer.onNewResult(cachedReference, Consumer.IS_LAST);
             cachedReference.close();
           } else {
             listener.onProducerFinishWithSuccess(
-                producerContext, PRODUCER_NAME, getExtraMap(listener, producerContext, false, 0));
+                producerContext,
+                PRODUCER_NAME,
+                getExtraMap(
+                    listener,
+                    producerContext,
+                    false,
+                    cachedReference == null ? 0 : cachedReference.getSize()));
             mInputProducer.produceResults(consumer, producerContext);
           }
         }

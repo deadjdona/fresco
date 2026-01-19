@@ -19,6 +19,8 @@ interface FrescoDrawableInterface : VisibilityAware {
   var callerContext: Any?
   val imagePerfListener: VitoImagePerfListener
   var uiFramework: String?
+  var forceReloadIfImageAlreadySet: Boolean
+  var retriggerListenersIfImageAlreadySet: Boolean
 
   fun setMutateDrawables(mutateDrawables: Boolean)
 
@@ -61,4 +63,7 @@ interface FrescoDrawableInterface : VisibilityAware {
 
   /** Gets the non-cropped post-scaling bounds of the actual image. */
   fun getActualImageBounds(outBounds: RectF)
+
+  /** Return true if the actual image has a HDR gain map. */
+  fun hasBitmapWithGainmap(): Boolean
 }

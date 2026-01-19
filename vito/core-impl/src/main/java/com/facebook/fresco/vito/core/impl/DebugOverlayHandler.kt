@@ -19,8 +19,11 @@ class DebugOverlayHandler(
             drawableDimensionsProvider,
             imageDimensionsProvider,
             imageOriginProvider,
-            imageOriginSubcategoryProvider)
+            imageOriginSubcategoryProvider,
+            hdrGainmapProvider,
+        ),
 ) {
+  constructor(isEnabled: Boolean) : this(Supplier { isEnabled }) {}
 
   fun update(drawable: KFrescoVitoDrawable) {
     if (!isEnabled.get()) {
@@ -42,9 +45,9 @@ class DebugOverlayHandler(
 
   private fun extractDebugOverlayDrawable(drawable: KFrescoVitoDrawable): DebugOverlayDrawable {
     val model = drawable.debugOverlayImageLayer?.getDataModel()
-    if (model == null ||
-        model !is DrawableImageDataModel ||
-        model.drawable !is DebugOverlayDrawable) {
+    if (
+        model == null || model !is DrawableImageDataModel || model.drawable !is DebugOverlayDrawable
+    ) {
       val debugOverlayDrawable = DebugOverlayDrawable("K")
       drawable.debugOverlayImageLayer =
           drawable.createLayer().apply {

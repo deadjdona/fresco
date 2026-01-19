@@ -12,6 +12,7 @@ import android.graphics.Paint
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.NinePatchDrawable
+import android.os.Build
 
 sealed class ImageDataModel {
   open val width: Int = -1
@@ -32,11 +33,21 @@ class BitmapImageDataModel(val bitmap: Bitmap, val isBitmapCircular: Boolean = f
   override val width: Int = bitmap.width
   override val height: Int = bitmap.height
   override val defaultPaintFlags: Int = Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG
+
+  fun hasGainmap() =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        bitmap.hasGainmap() == true
+      } else {
+        false
+      }
 }
 
-open class DrawableImageDataModel(val drawable: Drawable) : ImageDataModel() {
-  override val width: Int = if (drawable is NinePatchDrawable) -1 else drawable.intrinsicWidth
-  override val height: Int = if (drawable is NinePatchDrawable) -1 else drawable.intrinsicHeight
+open class DrawableImageDataModel(val drawable: Drawable, val disableScaling: Boolean = false) :
+    ImageDataModel() {
+  override val width: Int =
+      if (disableScaling || drawable is NinePatchDrawable) -1 else drawable.intrinsicWidth
+  override val height: Int =
+      if (disableScaling || drawable is NinePatchDrawable) -1 else drawable.intrinsicHeight
 
   override fun setCallback(callback: Drawable.Callback?) {
     drawable.callback = callback
@@ -46,7 +57,7 @@ open class DrawableImageDataModel(val drawable: Drawable) : ImageDataModel() {
 class AnimatedDrawableImageDataModel(
     drawable: Drawable,
     val animatable: Animatable,
-    val isAutoPlay: Boolean
+    val isAutoPlay: Boolean,
 ) : DrawableImageDataModel(drawable) {
   override fun onAttach() {
     if (isAutoPlay) {

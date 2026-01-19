@@ -7,6 +7,7 @@
 
 package com.facebook.fresco.animation.bitmap
 
+import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.Canvas
@@ -27,18 +28,29 @@ import com.facebook.fresco.animation.backend.AnimationBackendDelegateWithInactiv
 import com.facebook.fresco.animation.backend.AnimationInformation
 import com.facebook.fresco.animation.bitmap.preparation.BitmapFramePreparationStrategy
 import com.facebook.fresco.animation.bitmap.preparation.BitmapFramePreparer
+import com.facebook.fresco.ui.common.DimensionsInfo
+import com.facebook.fresco.vito.core.AnimatedImagePerfLoggingListener
+import com.facebook.fresco.vito.core.FrescoDrawableInterface
+import com.facebook.fresco.vito.listener.ImageListener
+import com.facebook.fresco.vito.options.AnimatedOptions
+import com.facebook.fresco.vito.options.ImageOptions
 import com.facebook.fresco.vito.options.RoundingOptions
+import com.facebook.fresco.vito.provider.FrescoVitoProvider
+import com.facebook.fresco.vito.source.ImageSourceProvider
 import com.facebook.imagepipeline.bitmaps.PlatformBitmapFactory
+import com.facebook.imagepipeline.image.ImageInfo
 
 /**
  * Bitmap animation backend that renders bitmap frames.
  *
  * The given [BitmapFrameCache] is used to cache frames and create new bitmaps.
  * [AnimationInformation] defines the main animation parameters, like frame and loop count.
- * [BitmapFrameRenderer] is used to render frames to the bitmaps aquired from the [BitmapFrameCache]
- * .
+ * [BitmapFrameRenderer] is used to render frames to the bitmaps acquired from the
+ * [BitmapFrameCache].
  */
-class BitmapAnimationBackend(
+class BitmapAnimationBackend
+@JvmOverloads
+constructor(
     private val platformBitmapFactory: PlatformBitmapFactory,
     private val bitmapFrameCache: BitmapFrameCache,
     private val animationInformation: AnimationInformation,
@@ -46,12 +58,18 @@ class BitmapAnimationBackend(
     private val isNewRenderImplementation: Boolean,
     private val bitmapFramePreparationStrategy: BitmapFramePreparationStrategy?,
     private val bitmapFramePreparer: BitmapFramePreparer?,
-    roundingOptions: RoundingOptions? = null,
+    val roundingOptions: RoundingOptions? = null,
+    val animatedOptions: AnimatedOptions? = null,
 ) : AnimationBackend, InactivityListener {
+
+  private val isCircular: Boolean = roundingOptions?.isCircular == true
+  private val isAntiAliased: Boolean = roundingOptions?.isAntiAliased == true
 
   val cornerRadii: FloatArray? =
       roundingOptions?.let { roundingOptions ->
-        if (roundingOptions.cornerRadius != RoundingOptions.CORNER_RADIUS_UNSET) {
+        if (isCircular) {
+          null
+        } else if (roundingOptions.cornerRadius != RoundingOptions.CORNER_RADIUS_UNSET) {
           val corners = FloatArray(8)
           corners.fill(roundingOptions.cornerRadius)
           corners
@@ -94,7 +112,8 @@ class BitmapAnimationBackend(
       FRAME_TYPE_CACHED,
       FRAME_TYPE_REUSED,
       FRAME_TYPE_CREATED,
-      FRAME_TYPE_FALLBACK)
+      FRAME_TYPE_FALLBACK,
+  )
   annotation class FrameType
 
   private val bitmapConfig = Bitmap.Config.ARGB_8888
@@ -110,13 +129,25 @@ class BitmapAnimationBackend(
 
   private var frameListener: FrameListener? = null
   private var animationListener: AnimationBackend.Listener? = null
+  private var animatedImagePerfLoggingListener: AnimatedImagePerfLoggingListener? = null
+
+  // Thumbnail fallback functionality
+  private var thumbnailDrawable: FrescoDrawableInterface? = null
+  private var animationCompleted: Boolean = false
+  private var totalFramesProcessed: Int = 0
+  private var lastFrameNumber: Int = -1
 
   init {
+    initializeThumbnailDrawable()
     updateBitmapDimensions()
   }
 
   fun setFrameListener(frameListener: FrameListener?) {
     this.frameListener = frameListener
+  }
+
+  fun setAnimatedImagePerfLoggingListener(listener: AnimatedImagePerfLoggingListener?) {
+    this.animatedImagePerfLoggingListener = listener
   }
 
   override fun getFrameCount(): Int = animationInformation.frameCount
@@ -130,21 +161,52 @@ class BitmapAnimationBackend(
 
   override fun getLoopDurationMs(): Int = animationInformation.loopDurationMs
 
-  override fun getLoopCount(): Int = animationInformation.loopCount
+  override fun getLoopCount(): Int {
+    // If no animated options are set, use the default loop count
+    if (animatedOptions == null) {
+      return animationInformation.loopCount
+    }
+
+    return when (animatedOptions.loopCount) {
+      AnimatedOptions.LOOP_COUNT_INFINITE -> AnimationInformation.LOOP_COUNT_INFINITE
+      else -> animatedOptions.loopCount
+    }
+  }
 
   override fun drawFrame(parent: Drawable, canvas: Canvas, frameNumber: Int): Boolean {
     frameListener?.onDrawFrameStart(this, frameNumber)
+
+    // Check if we should show thumbnail instead of animation frame
+    if (showThumbnail()) {
+      val thumbnailDrawn = drawThumbnail(canvas)
+      if (thumbnailDrawn) {
+        return true
+      }
+    }
+
     val drawn = drawFrameOrFallback(canvas, frameNumber, FRAME_TYPE_CACHED)
+
+    // Track animation progress for thumbnail fallback
+    trackAnimationProgress(frameNumber)
 
     // We could not draw anything
     if (!drawn) {
       frameListener?.onFrameDropped(this, frameNumber)
+
+      // Log frame drop for performance monitoring
+      val imageId = animationInformation.toString() // Use animation info as identifier
+      val timestamp = System.currentTimeMillis()
+      animatedImagePerfLoggingListener?.onFrameDropped(imageId, frameNumber, timestamp)
     }
 
     // Prepare next frames
     if (!isNewRenderImplementation && bitmapFramePreparer != null) {
       bitmapFramePreparationStrategy?.prepareFrames(
-          bitmapFramePreparer, bitmapFrameCache, this, frameNumber)
+          bitmapFramePreparer,
+          bitmapFrameCache,
+          this,
+          frameNumber,
+      )
     }
     return drawn
   }
@@ -152,7 +214,7 @@ class BitmapAnimationBackend(
   private fun drawFrameOrFallback(
       canvas: Canvas,
       frameNumber: Int,
-      @FrameType frameType: Int
+      @FrameType frameType: Int,
   ): Boolean {
     var bitmapReference: CloseableReference<Bitmap>? = null
     val drawn: Boolean
@@ -168,7 +230,7 @@ class BitmapAnimationBackend(
           return true
         }
 
-        // If bitmap couldnt be drawn, then fetch frames
+        // If bitmap could not be drawn, then fetch frames
         bitmapFramePreparationStrategy?.prepareFrames(canvas.width, canvas.height, null)
         return false
       }
@@ -232,6 +294,12 @@ class BitmapAnimationBackend(
     this.bounds = bounds
     bitmapFrameRenderer.setBounds(bounds)
     updateBitmapDimensions()
+
+    // Set bounds on thumbnail drawable when backend bounds change
+    thumbnailDrawable?.let { drawable ->
+      val thumbnailBounds = bounds ?: Rect(0, 0, width(), height())
+      (drawable as Drawable).setBounds(thumbnailBounds)
+    }
   }
 
   override fun getIntrinsicWidth(): Int = bitmapWidth
@@ -251,14 +319,20 @@ class BitmapAnimationBackend(
   override fun preloadAnimation() {
     if (!isNewRenderImplementation && bitmapFramePreparer != null) {
       bitmapFramePreparationStrategy?.prepareFrames(
-          bitmapFramePreparer, bitmapFrameCache, this, 0) {
-            animationListener?.onAnimationLoaded()
-          }
+          bitmapFramePreparer,
+          bitmapFrameCache,
+          this,
+          0,
+      ) {
+        animationListener?.onAnimationLoaded()
+      }
     } else {
       bitmapFramePreparationStrategy?.prepareFrames(
-          animationInformation.width(), animationInformation.height()) {
-            animationListener?.onAnimationLoaded()
-          }
+          animationInformation.width(),
+          animationInformation.height(),
+      ) {
+        animationListener?.onAnimationLoaded()
+      }
     }
   }
 
@@ -268,6 +342,8 @@ class BitmapAnimationBackend(
     } else {
       clear()
     }
+    thumbnailDrawable?.let { FrescoVitoProvider.getController().releaseImmediately(it) }
+    thumbnailDrawable = null
   }
 
   override fun setAnimationListener(listener: AnimationBackend.Listener?) {
@@ -297,7 +373,7 @@ class BitmapAnimationBackend(
    */
   private fun renderFrameInBitmap(
       frameNumber: Int,
-      targetBitmap: CloseableReference<Bitmap>?
+      targetBitmap: CloseableReference<Bitmap>?,
   ): Boolean {
     if (targetBitmap == null || !targetBitmap.isValid) {
       return false
@@ -314,9 +390,9 @@ class BitmapAnimationBackend(
       frameNumber: Int,
       bitmap: Bitmap,
       currentBoundsWidth: Float,
-      currentBoundsHeight: Float
+      currentBoundsHeight: Float,
   ): Boolean {
-    if (cornerRadii == null) {
+    if (!isCircular && cornerRadii == null) {
       return false
     }
     if (frameNumber == pathFrameNumber) {
@@ -329,8 +405,22 @@ class BitmapAnimationBackend(
     matrix.setRectToRect(src, dst, Matrix.ScaleToFit.FILL)
     bitmapShader.setLocalMatrix(matrix)
     paint.shader = bitmapShader
-    path.addRoundRect(
-        RectF(0f, 0f, currentBoundsWidth, currentBoundsHeight), cornerRadii, Path.Direction.CW)
+    paint.isAntiAlias = isAntiAliased
+
+    path.reset()
+
+    if (isCircular) {
+      val centerX = currentBoundsWidth / 2f
+      val centerY = currentBoundsHeight / 2f
+      val radius = minOf(centerX, centerY)
+      path.addCircle(centerX, centerY, radius, Path.Direction.CW)
+    } else {
+      path.addRoundRect(
+          RectF(0f, 0f, currentBoundsWidth, currentBoundsHeight),
+          cornerRadii ?: floatArrayOf(),
+          Path.Direction.CW,
+      )
+    }
 
     pathFrameNumber = frameNumber
     return true
@@ -342,8 +432,14 @@ class BitmapAnimationBackend(
     if (currentBounds == null) {
       canvas.drawBitmap(bitmap, 0f, 0f, paint)
     } else {
-      if (updatePath(
-          frameNumber, bitmap, currentBounds.width().toFloat(), currentBounds.height().toFloat())) {
+      if (
+          updatePath(
+              frameNumber,
+              bitmap,
+              currentBounds.width().toFloat(),
+              currentBounds.height().toFloat(),
+          )
+      ) {
         canvas.drawPath(path, paint)
       } else {
         canvas.drawBitmap(bitmap, null, currentBounds, paint)
@@ -367,7 +463,7 @@ class BitmapAnimationBackend(
       frameNumber: Int,
       bitmapReference: CloseableReference<Bitmap>?,
       canvas: Canvas,
-      @FrameType frameType: Int
+      @FrameType frameType: Int,
   ): Boolean {
     if (bitmapReference == null || !CloseableReference.isValid(bitmapReference)) {
       return false
@@ -385,6 +481,139 @@ class BitmapAnimationBackend(
     return true
   }
 
+  private fun initializeThumbnailDrawable() {
+    val options = animatedOptions
+    if (options?.useFallbackThumbnail() == true && !options.thumbnailUrl.isNullOrEmpty()) {
+      try {
+        thumbnailDrawable =
+            FrescoVitoProvider.getController().createDrawable("bitmap-animation-thumbnail")
+
+        // Load the thumbnail through Fresco's pipeline
+        options.thumbnailUrl?.let { url -> loadFrescoThumbnail(url) }
+      } catch (e: Exception) {
+        FLog.w(TAG, "Failed to initialize thumbnail drawable", e)
+        thumbnailDrawable = null
+      }
+    }
+  }
+
+  private fun loadFrescoThumbnail(thumbnailUrl: String) {
+    val drawable = thumbnailDrawable ?: return
+
+    try {
+      val imageOptions = ImageOptions.defaults().extend().round(roundingOptions).build()
+
+      val imageRequest =
+          FrescoVitoProvider.getImagePipeline()
+              .createImageRequest(
+                  Resources.getSystem(),
+                  ImageSourceProvider.forUri(thumbnailUrl),
+                  imageOptions,
+                  callerContext = CALLER_CONTEXT,
+              )
+
+      val imageListener =
+          object : ImageListener {
+            override fun onFinalImageSet(
+                id: Long,
+                imageOrigin: Int,
+                imageInfo: ImageInfo?,
+                drawable: Drawable?,
+            ) = Unit
+
+            override fun onFailure(id: Long, error: Drawable?, throwable: Throwable?) {
+              FLog.w(TAG, "Failed to load thumbnail from URL: $thumbnailUrl", throwable)
+              thumbnailDrawable = null
+            }
+
+            override fun onImageDrawn(
+                id: String,
+                imageInfo: ImageInfo,
+                dimensionsInfo: DimensionsInfo,
+            ) {
+              // Image drawn
+            }
+          }
+
+      FrescoVitoProvider.getController()
+          .fetch(
+              drawable = drawable,
+              imageRequest = imageRequest,
+              callerContext = CALLER_CONTEXT,
+              contextChain = null,
+              listener = imageListener,
+              onFadeListener = null,
+              viewportDimensions = null,
+          )
+    } catch (e: Exception) {
+      FLog.w(TAG, "Failed to load thumbnail through Fresco: $thumbnailUrl", e)
+      // Release the image
+      thumbnailDrawable?.let { FrescoVitoProvider.getController().releaseImmediately(it) }
+      thumbnailDrawable = null
+    }
+  }
+
+  private fun showThumbnail(): Boolean {
+    val options = animatedOptions ?: return false
+
+    // Only show thumbnail if we should use fallback thumbnail and we have a thumbnail drawable
+    if (!options.useFallbackThumbnail() || thumbnailDrawable?.hasImage() != true) {
+      return false
+    }
+
+    if (animationCompleted) {
+      return true
+    }
+    return false
+  }
+
+  private fun drawThumbnail(canvas: Canvas): Boolean {
+    val frescoDrawable = thumbnailDrawable ?: return false
+
+    if (!frescoDrawable.hasImage()) {
+      return false
+    }
+
+    try {
+      val drawable = frescoDrawable as Drawable
+      drawable.draw(canvas)
+      return true
+    } catch (e: Exception) {
+      FLog.w(TAG, "Failed to draw thumbnail drawable", e)
+      return false
+    }
+  }
+
+  // Track animation progress for thumbnail fallback
+  private fun trackAnimationProgress(frameNumber: Int) {
+    val options = animatedOptions ?: return
+
+    if (!options.useFallbackThumbnail()) {
+      return
+    }
+
+    val totalLoops = getLoopCount()
+    val framesPerLoop = getFrameCount()
+
+    if (totalLoops == AnimationInformation.LOOP_COUNT_INFINITE) {
+      return
+    }
+
+    if (frameNumber < lastFrameNumber) {
+      totalFramesProcessed += framesPerLoop
+    }
+    lastFrameNumber = frameNumber
+
+    // Calculate current loop and frame within loop
+    val currentLoop = totalFramesProcessed / framesPerLoop
+    val frameInLoop = frameNumber
+
+    // Last loop reached, mark animation as completed
+    if (currentLoop >= totalLoops - 1 && frameInLoop == framesPerLoop - 1) {
+      animationCompleted = true
+    }
+  }
+
   companion object {
     const val FRAME_TYPE_UNKNOWN: Int = -1
     const val FRAME_TYPE_CACHED = 0
@@ -392,5 +621,6 @@ class BitmapAnimationBackend(
     const val FRAME_TYPE_CREATED = 2
     const val FRAME_TYPE_FALLBACK = 3
     private val TAG = BitmapAnimationBackend::class.java
+    private const val CALLER_CONTEXT = "BitmapAnimationBackend"
   }
 }

@@ -11,10 +11,7 @@ import android.os.Build
 import androidx.core.util.Pools
 import androidx.core.util.Pools.SynchronizedPool
 import com.facebook.common.memory.DecodeBufferHelper
-import com.facebook.imagepipeline.core.NativeCodeSetup
-import com.facebook.imagepipeline.memory.FlexByteArrayPool
 import com.facebook.imagepipeline.memory.PoolFactory
-import java.lang.reflect.InvocationTargetException
 import java.nio.ByteBuffer
 
 object PlatformDecoderFactory {
@@ -31,36 +28,20 @@ object PlatformDecoderFactory {
   fun buildPlatformDecoder(
       poolFactory: PoolFactory,
       useDecodeBufferHelper: Boolean = false,
-      platformDecoderOptions: PlatformDecoderOptions
+      platformDecoderOptions: PlatformDecoderOptions,
   ): PlatformDecoder =
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         OreoDecoder(
             poolFactory.bitmapPool,
             createPool(poolFactory, useDecodeBufferHelper),
-            platformDecoderOptions)
-      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ||
-          !NativeCodeSetup.getUseNativeCode()) {
+            platformDecoderOptions,
+        )
+      } else {
         ArtDecoder(
             poolFactory.bitmapPool,
             createPool(poolFactory, useDecodeBufferHelper),
-            platformDecoderOptions)
-      } else {
-        try {
-          val clazz = Class.forName("com.facebook.imagepipeline.platform.KitKatPurgeableDecoder")
-          clazz
-              .getConstructor(FlexByteArrayPool::class.java)
-              .newInstance(poolFactory.flexByteArrayPool) as PlatformDecoder
-        } catch (e: ClassNotFoundException) {
-          throw RuntimeException("Wrong Native code setup, reflection failed.", e)
-        } catch (e: IllegalAccessException) {
-          throw RuntimeException("Wrong Native code setup, reflection failed.", e)
-        } catch (e: NoSuchMethodException) {
-          throw RuntimeException("Wrong Native code setup, reflection failed.", e)
-        } catch (e: InvocationTargetException) {
-          throw RuntimeException("Wrong Native code setup, reflection failed.", e)
-        } catch (e: InstantiationException) {
-          throw RuntimeException("Wrong Native code setup, reflection failed.", e)
-        }
+            platformDecoderOptions,
+        )
       }
 
   @JvmStatic

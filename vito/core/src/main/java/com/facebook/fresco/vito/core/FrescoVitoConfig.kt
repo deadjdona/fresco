@@ -7,6 +7,7 @@
 
 package com.facebook.fresco.vito.core
 
+import android.net.Uri
 import com.facebook.common.callercontext.ContextChain
 import com.facebook.common.internal.Supplier
 
@@ -14,6 +15,24 @@ interface FrescoVitoConfig {
   val prefetchConfig: PrefetchConfig
 
   fun submitFetchOnBgThread(): Boolean
+
+  fun useBind(): Boolean
+
+  fun useMount(): Boolean
+
+  fun useUnmount(): Boolean
+
+  fun useUnbind(): Boolean
+
+  fun useDetached(): Boolean
+
+  fun onUnbindReleaseStrategy(): ReleaseStrategy
+
+  fun onUnmountReleaseStrategy(): ReleaseStrategy
+
+  fun onDetachedReleaseStrategy(): ReleaseStrategy
+
+  fun releaseDelayMs(): Long
 
   fun useBindOnly(): Boolean
 
@@ -57,7 +76,12 @@ interface FrescoVitoConfig {
 
   fun experimentalDynamicSizeIsProductEnabled(
       callerContext: Any?,
-      contextChain: ContextChain?
+      contextChain: ContextChain?,
+  ): Boolean
+
+  fun experimentalDynamicSizeIsFallbackEnabled(
+      callerContext: Any?,
+      contextChain: ContextChain?,
   ): Boolean
 
   fun isCallerContextBloks(callerContext: Any?): Boolean
@@ -69,4 +93,10 @@ interface FrescoVitoConfig {
   fun experimentalResetLocalImagePerfStateListener(): Boolean
 
   fun experimentalResetControllerListener2(): Boolean
+
+  fun experimentalDynamicSizeIsUriEligible(uri: Uri?): Boolean
+
+  fun enablePrepareToDrawOnFetch(): Boolean
+
+  fun experimentalOptimizeAlphaHandling(): Boolean
 }

@@ -7,10 +7,11 @@
 
 package com.facebook.imagepipeline.producers;
 
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 
@@ -26,16 +27,18 @@ import com.facebook.imageutils.ImageMetaData;
 import com.facebook.imageutils.JfifUtil;
 import java.io.InputStream;
 import javax.annotation.Nullable;
-import org.junit.*;
 import org.junit.After;
-import org.junit.runner.*;
-import org.mockito.*;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
-import org.mockito.invocation.*;
-import org.mockito.stubbing.*;
-import org.robolectric.*;
-import org.robolectric.annotation.*;
+import org.mockito.MockitoAnnotations;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
@@ -101,11 +104,11 @@ public class AddImageTransformMetaDataProducerTest {
     ArgumentCaptor<EncodedImage> argumentCaptor = ArgumentCaptor.forClass(EncodedImage.class);
     verify(mConsumer).onNewResult(argumentCaptor.capture(), eq(Consumer.IS_LAST));
     EncodedImage encodedImage = argumentCaptor.getValue();
-    assertTrue(EncodedImage.isValid(encodedImage));
-    assertEquals(DefaultImageFormats.WEBP_SIMPLE, encodedImage.getImageFormat());
-    assertEquals(0, encodedImage.getRotationAngle());
-    assertEquals(-1, encodedImage.getWidth());
-    assertEquals(-1, encodedImage.getHeight());
+    assertThat(EncodedImage.isValid(encodedImage)).isTrue();
+    assertThat(encodedImage.getImageFormat()).isEqualTo(DefaultImageFormats.WEBP_SIMPLE);
+    assertThat(encodedImage.getRotationAngle()).isEqualTo(0);
+    assertThat(encodedImage.getWidth()).isEqualTo(-1);
+    assertThat(encodedImage.getHeight()).isEqualTo(-1);
   }
 
   @Test
@@ -120,11 +123,11 @@ public class AddImageTransformMetaDataProducerTest {
     ArgumentCaptor<EncodedImage> argumentCaptor = ArgumentCaptor.forClass(EncodedImage.class);
     verify(mConsumer).onNewResult(argumentCaptor.capture(), eq(Consumer.NO_FLAGS));
     EncodedImage encodedImage = argumentCaptor.getValue();
-    assertTrue(EncodedImage.isValid(encodedImage));
-    assertEquals(DefaultImageFormats.WEBP_SIMPLE, encodedImage.getImageFormat());
-    assertEquals(0, encodedImage.getRotationAngle());
-    assertEquals(-1, encodedImage.getWidth());
-    assertEquals(-1, encodedImage.getHeight());
+    assertThat(EncodedImage.isValid(encodedImage)).isTrue();
+    assertThat(encodedImage.getImageFormat()).isEqualTo(DefaultImageFormats.WEBP_SIMPLE);
+    assertThat(encodedImage.getRotationAngle()).isEqualTo(0);
+    assertThat(encodedImage.getWidth()).isEqualTo(-1);
+    assertThat(encodedImage.getHeight()).isEqualTo(-1);
   }
 
   @Test
@@ -147,10 +150,10 @@ public class AddImageTransformMetaDataProducerTest {
     ArgumentCaptor<EncodedImage> argumentCaptor = ArgumentCaptor.forClass(EncodedImage.class);
     verify(mConsumer).onNewResult(argumentCaptor.capture(), eq(Consumer.NO_FLAGS));
     EncodedImage encodedImage = argumentCaptor.getValue();
-    assertTrue(EncodedImage.isValid(encodedImage));
-    assertEquals(-1, encodedImage.getRotationAngle());
-    assertEquals(-1, encodedImage.getWidth());
-    assertEquals(-1, encodedImage.getHeight());
+    assertThat(EncodedImage.isValid(encodedImage)).isTrue();
+    assertThat(encodedImage.getRotationAngle()).isEqualTo(-1);
+    assertThat(encodedImage.getWidth()).isEqualTo(-1);
+    assertThat(encodedImage.getHeight()).isEqualTo(-1);
   }
 
   @Test
@@ -168,10 +171,10 @@ public class AddImageTransformMetaDataProducerTest {
     ArgumentCaptor<EncodedImage> argumentCaptor = ArgumentCaptor.forClass(EncodedImage.class);
     verify(mConsumer).onNewResult(argumentCaptor.capture(), eq(Consumer.NO_FLAGS));
     EncodedImage encodedImage = argumentCaptor.getValue();
-    assertTrue(EncodedImage.isValid(encodedImage));
-    assertEquals(-1, encodedImage.getRotationAngle());
-    assertEquals(-1, encodedImage.getWidth());
-    assertEquals(-1, encodedImage.getHeight());
+    assertThat(EncodedImage.isValid(encodedImage)).isTrue();
+    assertThat(encodedImage.getRotationAngle()).isEqualTo(-1);
+    assertThat(encodedImage.getWidth()).isEqualTo(-1);
+    assertThat(encodedImage.getHeight()).isEqualTo(-1);
   }
 
   @Test
@@ -196,11 +199,11 @@ public class AddImageTransformMetaDataProducerTest {
     ArgumentCaptor<EncodedImage> argumentCaptor = ArgumentCaptor.forClass(EncodedImage.class);
     verify(mConsumer).onNewResult(argumentCaptor.capture(), eq(Consumer.IS_LAST));
     EncodedImage encodedImage = argumentCaptor.getValue();
-    assertTrue(EncodedImage.isValid(encodedImage));
-    assertEquals(DefaultImageFormats.JPEG, encodedImage.getImageFormat());
-    assertEquals(rotationAngle, encodedImage.getRotationAngle());
-    assertEquals(width, encodedImage.getWidth());
-    assertEquals(height, encodedImage.getHeight());
+    assertThat(EncodedImage.isValid(encodedImage)).isTrue();
+    assertThat(encodedImage.getImageFormat()).isEqualTo(DefaultImageFormats.JPEG);
+    assertThat(encodedImage.getRotationAngle()).isEqualTo(rotationAngle);
+    assertThat(encodedImage.getWidth()).isEqualTo(width);
+    assertThat(encodedImage.getHeight()).isEqualTo(height);
   }
 
   @Test
@@ -225,11 +228,11 @@ public class AddImageTransformMetaDataProducerTest {
     ArgumentCaptor<EncodedImage> argumentCaptor = ArgumentCaptor.forClass(EncodedImage.class);
     verify(mConsumer).onNewResult(argumentCaptor.capture(), eq(Consumer.IS_LAST));
     EncodedImage encodedImage = argumentCaptor.getValue();
-    assertTrue(EncodedImage.isValid(encodedImage));
-    assertEquals(DefaultImageFormats.JPEG, encodedImage.getImageFormat());
-    assertEquals(rotationAngle, encodedImage.getRotationAngle());
-    assertEquals(width, encodedImage.getWidth());
-    assertEquals(height, encodedImage.getHeight());
+    assertThat(EncodedImage.isValid(encodedImage)).isTrue();
+    assertThat(encodedImage.getImageFormat()).isEqualTo(DefaultImageFormats.JPEG);
+    assertThat(encodedImage.getRotationAngle()).isEqualTo(rotationAngle);
+    assertThat(encodedImage.getWidth()).isEqualTo(width);
+    assertThat(encodedImage.getHeight()).isEqualTo(height);
   }
 
   @Test
@@ -250,6 +253,6 @@ public class AddImageTransformMetaDataProducerTest {
     ArgumentCaptor<EncodedImage> argumentCaptor = ArgumentCaptor.forClass(EncodedImage.class);
     verify(mConsumer).onNewResult(argumentCaptor.capture(), eq(Consumer.IS_LAST));
     EncodedImage encodedImage = argumentCaptor.getValue();
-    assertNull(encodedImage);
+    assertThat(encodedImage).isNull();
   }
 }

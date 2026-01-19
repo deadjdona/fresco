@@ -10,7 +10,6 @@ package com.facebook.fresco.vito.draweesupport
 import android.content.Context
 import android.content.res.TypedArray
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.util.AttributeSet
 import android.view.View
 import com.facebook.drawee.R
@@ -26,7 +25,7 @@ object VitoViewInflater {
   @JvmStatic
   fun inflateImageOptionsBuilder(
       context: Context,
-      attributeSet: AttributeSet?
+      attributeSet: AttributeSet?,
   ): ImageOptions.Builder {
     if (attributeSet == null) {
       return ImageOptions.create()
@@ -47,13 +46,16 @@ object VitoViewInflater {
                 // wrap progress bar if auto-rotating requested
                 val progressBarAutoRotateInterval =
                     attrs.getInteger(
-                        R.styleable.GenericDraweeHierarchy_progressBarAutoRotateInterval, 0)
+                        R.styleable.GenericDraweeHierarchy_progressBarAutoRotateInterval,
+                        0,
+                    )
                 progress(
                     if (progressBarAutoRotateInterval > 0) {
                       AutoRotateDrawable(progressBarDrawable, progressBarAutoRotateInterval)
                     } else {
                       progressBarDrawable
-                    })
+                    }
+                )
               }
             }
             R.styleable.GenericDraweeHierarchy_fadeDuration -> fadeDurationMs(attrs.getInt(attr, 0))
@@ -91,8 +93,7 @@ object VitoViewInflater {
                 val roundBottomEnd =
                     attrs.getBoolean(R.styleable.GenericDraweeHierarchy_roundBottomEnd, true)
 
-                if (Build.VERSION.SDK_INT >= 17 &&
-                    context.resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
+                if (context.resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
                   roundTopLeft = roundTopLeft && roundTopEnd
                   roundTopRight = roundTopRight && roundTopStart
                   roundBottomRight = roundBottomRight && roundBottomStart
@@ -108,7 +109,9 @@ object VitoViewInflater {
                         if (roundTopLeft) radius else 0f,
                         if (roundTopRight) radius else 0f,
                         if (roundBottomRight) radius else 0f,
-                        if (roundBottomLeft) radius else 0f))
+                        if (roundBottomLeft) radius else 0f,
+                    )
+                )
               }
             }
             R.styleable.GenericDraweeHierarchy_roundingBorderWidth -> {
@@ -120,8 +123,12 @@ object VitoViewInflater {
                         borderWidth,
                         attrs
                             .getDimensionPixelSize(
-                                R.styleable.GenericDraweeHierarchy_roundingBorderPadding, 0)
-                            .toFloat()))
+                                R.styleable.GenericDraweeHierarchy_roundingBorderPadding,
+                                0,
+                            )
+                            .toFloat(),
+                    )
+                )
               }
             }
             R.styleable.GenericDraweeHierarchy_retryImage,

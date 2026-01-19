@@ -21,7 +21,7 @@ import javax.annotation.Nullable;
 @Nullsafe(Nullsafe.Mode.LOCAL)
 public abstract class BaseCloseableImage implements CloseableImage {
 
-  private Map<String, Object> mExtras = new HashMap<>();
+  private final Map<String, Object> mExtras = new HashMap<>();
 
   /* Extras we want to set to the image */
   private static final Set<String> mImageExtrasList =
@@ -35,9 +35,12 @@ public abstract class BaseCloseableImage implements CloseableImage {
               HasExtraData.KEY_BITMAP_CONFIG,
               HasExtraData.KEY_IS_ROUNDED,
               HasExtraData.KEY_NON_FATAL_DECODE_ERROR,
-              HasExtraData.KEY_ORIGINAL_URL,
+              HasExtraData.KEY_SF_ORIGINAL_URL,
               HasExtraData.KEY_SF_FETCH_STRATEGY,
-              HasExtraData.KEY_COLOR_SPACE));
+              HasExtraData.KEY_COLOR_SPACE,
+              HasExtraData.KEY_SF_VARIATION,
+              HasExtraData.KEY_SF_QUERY,
+              HasExtraData.KEY_SF_AIQ));
 
   private @Nullable ImageInfo mCacheImageInfo;
 

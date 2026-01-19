@@ -36,6 +36,7 @@ import java.util.TimerTask
 object FrescoVitoSlideshowComponentSpec {
 
   @PropDefault const val isPlaying = true
+  @PropDefault const val isAlternativeTimerLogicEnable = false
 
   @JvmStatic
   @OnCreateInitialState
@@ -43,7 +44,7 @@ object FrescoVitoSlideshowComponentSpec {
       c: ComponentContext,
       slideshowIndex: StateValue<Int?>,
       timer: StateValue<Timer?>,
-      currentlyPlaying: StateValue<Boolean?>
+      currentlyPlaying: StateValue<Boolean?>,
   ) {
     slideshowIndex.set(0)
     timer.set(Timer("Fresco Vito slideshow timer"))
@@ -56,7 +57,8 @@ object FrescoVitoSlideshowComponentSpec {
       FrescoVitoSlideshowDrawable(
           FrescoVitoProvider.getController().createDrawable("litho"),
           FrescoVitoProvider.getController().createDrawable("litho"),
-          FrescoVitoProvider.getController().createDrawable("litho"))
+          FrescoVitoProvider.getController().createDrawable("litho"),
+      )
 
   @JvmStatic
   @OnMount
@@ -72,9 +74,10 @@ object FrescoVitoSlideshowComponentSpec {
       @Prop(optional = true) callerContext: Any?,
       @Prop(optional = true) imageListener: ImageListener?,
       @TreeProp contextChain: ContextChain?,
+      @Prop(optional = true) isAlternativeTimerLogicEnable: Boolean?,
       @State(canUpdateLazily = true) slideshowIndex: Int,
       @State(canUpdateLazily = true) timer: Timer,
-      @State(canUpdateLazily = true) currentlyPlaying: Boolean
+      @State(canUpdateLazily = true) currentlyPlaying: Boolean,
   ) {
     // Reset mount content
     val controller = FrescoVitoProvider.getController()
@@ -94,7 +97,8 @@ object FrescoVitoSlideshowComponentSpec {
         imageOptions,
         callerContext,
         contextChain,
-        imageListener)
+        imageListener,
+    )
     // Immediately show current image
     slideshowDrawable.fadeToNext()
     slideshowDrawable.finishTransitionImmediately()
@@ -109,7 +113,8 @@ object FrescoVitoSlideshowComponentSpec {
           imageOptions,
           callerContext,
           contextChain,
-          imageListener)
+          imageListener,
+      )
 
       var delayAttempt = 0
       val maxDelayAttempts =
@@ -140,7 +145,8 @@ object FrescoVitoSlideshowComponentSpec {
                   callerContext,
                   contextChain,
                   nextIndex,
-                  imageListener)
+                  imageListener,
+              )
               currentIndex = nextIndex
               FrescoVitoSlideshowComponent.lazyUpdateSlideshowIndex(c, currentIndex)
             }
@@ -153,8 +159,19 @@ object FrescoVitoSlideshowComponentSpec {
             }
           }
       slideshowDrawable.timerTask = timerTask
-      timer.scheduleAtFixedRate(
-          timerTask, photoTransitionMs.toLong(), (photoTransitionMs + fadeTransitionMs).toLong())
+      if (isAlternativeTimerLogicEnable == true && heroMediaTransitionMs != null) {
+        timer.scheduleAtFixedRate(
+            timerTask,
+            heroMediaTransitionMs.toLong(),
+            (photoTransitionMs + fadeTransitionMs).toLong(),
+        )
+      } else {
+        timer.scheduleAtFixedRate(
+            timerTask,
+            photoTransitionMs.toLong(),
+            (photoTransitionMs + fadeTransitionMs).toLong(),
+        )
+      }
     } else if (!isPlaying && currentlyPlaying) {
       val animateTask = slideshowDrawable.timerTask
       animateTask?.cancel()
@@ -181,11 +198,13 @@ object FrescoVitoSlideshowComponentSpec {
       callerContext: Any?,
       contextChain: ContextChain?,
       nextIndex: Int,
-      listener: ImageListener?
+      listener: ImageListener?,
   ) {
     // Do not transition until both current and next images are available
-    if (isStillLoading(slideshowDrawable.currentImage) ||
-        isStillLoading(slideshowDrawable.nextImage)) {
+    if (
+        isStillLoading(slideshowDrawable.currentImage) ||
+            isStillLoading(slideshowDrawable.nextImage)
+    ) {
       return
     }
     // Both images are available -> we can fade
@@ -198,7 +217,8 @@ object FrescoVitoSlideshowComponentSpec {
         options,
         callerContext,
         contextChain,
-        listener)
+        listener,
+    )
   }
 
   private fun isStillLoading(frescoDrawable: FrescoDrawableInterface): Boolean =
@@ -211,7 +231,7 @@ object FrescoVitoSlideshowComponentSpec {
       options: ImageOptions?,
       callerContext: Any?,
       contextChain: ContextChain?,
-      listener: ImageListener?
+      listener: ImageListener?,
   ) {
     FrescoVitoProvider.getController()
         .fetch(
@@ -222,11 +242,13 @@ object FrescoVitoSlideshowComponentSpec {
                         resources,
                         ImageSourceProvider.forUri(uri),
                         options,
-                        callerContext = callerContext),
+                        callerContext = callerContext,
+                    ),
             callerContext = callerContext,
             contextChain = contextChain,
             listener = listener,
             onFadeListener = null,
-            viewportDimensions = null)
+            viewportDimensions = null,
+        )
   }
 }

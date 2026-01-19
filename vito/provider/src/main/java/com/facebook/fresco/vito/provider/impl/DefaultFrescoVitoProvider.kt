@@ -52,7 +52,8 @@ class DefaultFrescoVitoProvider(
   init {
     if (!ImagePipelineFactory.hasBeenInitialized()) {
       throw RuntimeException(
-          "Fresco must be initialized before DefaultFrescoVitoProvider can be used!")
+          "Fresco must be initialized before DefaultFrescoVitoProvider can be used!"
+      )
     }
     frescoVitoPrefetcher =
         FrescoVitoPrefetcherImpl(imagePipeline, imagePipelineUtils, callerContextVerifier)
@@ -67,7 +68,8 @@ class DefaultFrescoVitoProvider(
             null,
             debugOverlayFactory,
             imagePerfListenerSupplier,
-            vitoImagePerfListener)
+            vitoImagePerfListener,
+        )
   }
 
   override fun getController(): FrescoController2 = frescoController

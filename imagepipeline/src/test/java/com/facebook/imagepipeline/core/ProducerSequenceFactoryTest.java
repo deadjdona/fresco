@@ -14,9 +14,7 @@ import static com.facebook.imagepipeline.common.SourceUriType.SOURCE_TYPE_LOCAL_
 import static com.facebook.imagepipeline.common.SourceUriType.SOURCE_TYPE_LOCAL_VIDEO_FILE;
 import static com.facebook.imagepipeline.common.SourceUriType.SOURCE_TYPE_NETWORK;
 import static com.facebook.imagepipeline.common.SourceUriType.SOURCE_TYPE_UNKNOWN;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.RETURNS_MOCKS;
@@ -98,7 +96,10 @@ public class ProducerSequenceFactoryTest {
             false,
             false,
             null,
-            5);
+            5,
+            false,
+            false,
+            false);
 
     when(mImageRequest.getLowestPermittedRequestLevel())
         .thenReturn(ImageRequest.RequestLevel.FULL_FETCH);
@@ -122,7 +123,7 @@ public class ProducerSequenceFactoryTest {
   public void testNetworkFullFetch() {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_NETWORK);
     Producer producer = mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getNetworkFetchSequence());
+    assertThat(producer).isSameAs(mProducerSequenceFactory.getNetworkFetchSequence());
   }
 
   @Test
@@ -133,7 +134,7 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_UNKNOWN);
 
     Producer producer = mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(producerSequenceFactory.isCalled, true);
+    assertThat(producerSequenceFactory.isCalled).isSameAs(true);
   }
 
   @Test
@@ -144,7 +145,7 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_NETWORK);
 
     Producer producer = mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(producerSequenceFactory.isCalled, false);
+    assertThat(producerSequenceFactory.isCalled).isSameAs(false);
   }
 
   @Test
@@ -152,11 +153,11 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_NETWORK);
     Producer<Void> producer =
         mProducerSequenceFactory.getDecodedImagePrefetchProducerSequence(mImageRequest);
-    assertSame(
-        producer,
-        mProducerSequenceFactory
-            .getCloseableImagePrefetchSequences()
-            .get(mProducerSequenceFactory.getNetworkFetchSequence()));
+    assertThat(producer)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getCloseableImagePrefetchSequences()
+                .get(mProducerSequenceFactory.getNetworkFetchSequence()));
   }
 
   @Test
@@ -164,11 +165,13 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_IMAGE_FILE);
     Producer<CloseableReference<PooledByteBuffer>> producer =
         mProducerSequenceFactory.getEncodedImageProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getLocalFileFetchEncodedImageProducerSequence());
+    assertThat(producer)
+        .isSameAs(mProducerSequenceFactory.getLocalFileFetchEncodedImageProducerSequence());
     // Same for Video
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_IMAGE_FILE);
     producer = mProducerSequenceFactory.getEncodedImageProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getLocalFileFetchEncodedImageProducerSequence());
+    assertThat(producer)
+        .isSameAs(mProducerSequenceFactory.getLocalFileFetchEncodedImageProducerSequence());
   }
 
   @Test
@@ -176,7 +179,8 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_NETWORK);
     Producer<CloseableReference<PooledByteBuffer>> producer =
         mProducerSequenceFactory.getEncodedImageProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getNetworkFetchEncodedImageProducerSequence());
+    assertThat(producer)
+        .isSameAs(mProducerSequenceFactory.getNetworkFetchEncodedImageProducerSequence());
   }
 
   @Test
@@ -184,13 +188,13 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_VIDEO_FILE);
     Producer<Void> producer =
         mProducerSequenceFactory.getEncodedImagePrefetchProducerSequence(mImageRequest);
-    assertSame(
-        producer, mProducerSequenceFactory.getLocalFileFetchToEncodedMemoryPrefetchSequence());
+    assertThat(producer)
+        .isSameAs(mProducerSequenceFactory.getLocalFileFetchToEncodedMemoryPrefetchSequence());
     // Same for image
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_IMAGE_FILE);
     producer = mProducerSequenceFactory.getEncodedImagePrefetchProducerSequence(mImageRequest);
-    assertSame(
-        producer, mProducerSequenceFactory.getLocalFileFetchToEncodedMemoryPrefetchSequence());
+    assertThat(producer)
+        .isSameAs(mProducerSequenceFactory.getLocalFileFetchToEncodedMemoryPrefetchSequence());
   }
 
   @Test
@@ -198,7 +202,8 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_NETWORK);
     Producer<Void> producer =
         mProducerSequenceFactory.getEncodedImagePrefetchProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getNetworkFetchToEncodedMemoryPrefetchSequence());
+    assertThat(producer)
+        .isSameAs(mProducerSequenceFactory.getNetworkFetchToEncodedMemoryPrefetchSequence());
   }
 
   @Test
@@ -206,7 +211,7 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_IMAGE_FILE);
     Producer<CloseableReference<CloseableImage>> producer =
         mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getLocalImageFileFetchSequence());
+    assertThat(producer).isSameAs(mProducerSequenceFactory.getLocalImageFileFetchSequence());
   }
 
   @Test
@@ -214,11 +219,11 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_IMAGE_FILE);
     Producer<Void> producer =
         mProducerSequenceFactory.getDecodedImagePrefetchProducerSequence(mImageRequest);
-    assertSame(
-        producer,
-        mProducerSequenceFactory
-            .getCloseableImagePrefetchSequences()
-            .get(mProducerSequenceFactory.getLocalImageFileFetchSequence()));
+    assertThat(producer)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getCloseableImagePrefetchSequences()
+                .get(mProducerSequenceFactory.getLocalImageFileFetchSequence()));
   }
 
   @Test
@@ -226,7 +231,7 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_VIDEO_FILE);
     Producer<CloseableReference<CloseableImage>> producer =
         mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getLocalVideoFileFetchSequence());
+    assertThat(producer).isSameAs(mProducerSequenceFactory.getLocalVideoFileFetchSequence());
   }
 
   @Test
@@ -234,11 +239,11 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_VIDEO_FILE);
     Producer<Void> producer =
         mProducerSequenceFactory.getDecodedImagePrefetchProducerSequence(mImageRequest);
-    assertSame(
-        producer,
-        mProducerSequenceFactory
-            .getCloseableImagePrefetchSequences()
-            .get(mProducerSequenceFactory.getLocalVideoFileFetchSequence()));
+    assertThat(producer)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getCloseableImagePrefetchSequences()
+                .get(mProducerSequenceFactory.getLocalVideoFileFetchSequence()));
   }
 
   @Test
@@ -246,7 +251,7 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_CONTENT);
     Producer<CloseableReference<CloseableImage>> producer =
         mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getLocalContentUriFetchSequence());
+    assertThat(producer).isSameAs(mProducerSequenceFactory.getLocalContentUriFetchSequence());
   }
 
   @Test
@@ -254,11 +259,11 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_CONTENT);
     Producer<Void> producer =
         mProducerSequenceFactory.getDecodedImagePrefetchProducerSequence(mImageRequest);
-    assertSame(
-        producer,
-        mProducerSequenceFactory
-            .getCloseableImagePrefetchSequences()
-            .get(mProducerSequenceFactory.getLocalContentUriFetchSequence()));
+    assertThat(producer)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getCloseableImagePrefetchSequences()
+                .get(mProducerSequenceFactory.getLocalContentUriFetchSequence()));
   }
 
   @Test
@@ -266,7 +271,7 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_RESOURCE);
     Producer<CloseableReference<CloseableImage>> producer =
         mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getLocalResourceFetchSequence());
+    assertThat(producer).isSameAs(mProducerSequenceFactory.getLocalResourceFetchSequence());
   }
 
   @Test
@@ -274,7 +279,7 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_ASSET);
     Producer<CloseableReference<CloseableImage>> producer =
         mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(producer, mProducerSequenceFactory.getLocalAssetFetchSequence());
+    assertThat(producer).isSameAs(mProducerSequenceFactory.getLocalAssetFetchSequence());
   }
 
   @Test
@@ -282,20 +287,20 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_RESOURCE);
     Producer<Void> localResourceSequence =
         mProducerSequenceFactory.getDecodedImagePrefetchProducerSequence(mImageRequest);
-    assertSame(
-        localResourceSequence,
-        mProducerSequenceFactory
-            .getCloseableImagePrefetchSequences()
-            .get(mProducerSequenceFactory.getLocalResourceFetchSequence()));
+    assertThat(localResourceSequence)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getCloseableImagePrefetchSequences()
+                .get(mProducerSequenceFactory.getLocalResourceFetchSequence()));
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_ASSET);
     Producer localAssetSequence =
         mProducerSequenceFactory.getDecodedImagePrefetchProducerSequence(mImageRequest);
-    assertSame(
-        localAssetSequence,
-        mProducerSequenceFactory
-            .getCloseableImagePrefetchSequences()
-            .get(mProducerSequenceFactory.getLocalAssetFetchSequence()));
-    assertNotSame(localAssetSequence, localResourceSequence);
+    assertThat(localAssetSequence)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getCloseableImagePrefetchSequences()
+                .get(mProducerSequenceFactory.getLocalAssetFetchSequence()));
+    assertThat(localAssetSequence).isNotSameAs(localResourceSequence);
   }
 
   @Test
@@ -304,34 +309,35 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getPostprocessor()).thenReturn(mPostprocessor);
     Producer<CloseableReference<CloseableImage>> networkSequence =
         mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(
-        networkSequence,
-        mProducerSequenceFactory
-            .getPostprocessorSequences()
-            .get(mProducerSequenceFactory.getNetworkFetchSequence()));
+    assertThat(networkSequence)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getPostprocessorSequences()
+                .get(mProducerSequenceFactory.getNetworkFetchSequence()));
 
     // each source type should be different
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_LOCAL_CONTENT);
 
     Producer<CloseableReference<CloseableImage>> localSequence =
         mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(
-        localSequence,
-        mProducerSequenceFactory
-            .getPostprocessorSequences()
-            .get(mProducerSequenceFactory.getLocalContentUriFetchSequence()));
-    assertNotSame(networkSequence, localSequence);
+    assertThat(localSequence)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getPostprocessorSequences()
+                .get(mProducerSequenceFactory.getLocalContentUriFetchSequence()));
+    assertThat(networkSequence).isNotSameAs(localSequence);
 
     // encoded return types don't get postprocessed
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_NETWORK);
     Producer<CloseableReference<PooledByteBuffer>> encodedSequence =
         mProducerSequenceFactory.getEncodedImageProducerSequence(mImageRequest);
-    assertSame(
-        encodedSequence, mProducerSequenceFactory.getNetworkFetchEncodedImageProducerSequence());
-    assertNull(
-        mProducerSequenceFactory
-            .getPostprocessorSequences()
-            .get(mProducerSequenceFactory.getBackgroundNetworkFetchToEncodedMemorySequence()));
+    assertThat(encodedSequence)
+        .isSameAs(mProducerSequenceFactory.getNetworkFetchEncodedImageProducerSequence());
+    assertThat(
+            mProducerSequenceFactory
+                .getPostprocessorSequences()
+                .get(mProducerSequenceFactory.getBackgroundNetworkFetchToEncodedMemorySequence()))
+        .isNull();
   }
 
   @Test
@@ -341,11 +347,11 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getSourceUriType()).thenReturn(SOURCE_TYPE_NETWORK);
 
     Producer producer = mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(
-        producer,
-        mProducerSequenceFactory
-            .getBitmapPrepareSequences()
-            .get(mProducerSequenceFactory.getNetworkFetchSequence()));
+    assertThat(producer)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getBitmapPrepareSequences()
+                .get(mProducerSequenceFactory.getNetworkFetchSequence()));
   }
 
   @Test
@@ -356,14 +362,14 @@ public class ProducerSequenceFactoryTest {
     when(mImageRequest.getPostprocessor()).thenReturn(mPostprocessor);
 
     Producer producer = mProducerSequenceFactory.getDecodedImageProducerSequence(mImageRequest);
-    assertSame(
-        producer,
-        mProducerSequenceFactory
-            .getBitmapPrepareSequences()
-            .get(
-                mProducerSequenceFactory
-                    .getPostprocessorSequences()
-                    .get(mProducerSequenceFactory.getNetworkFetchSequence())));
+    assertThat(producer)
+        .isSameAs(
+            mProducerSequenceFactory
+                .getBitmapPrepareSequences()
+                .get(
+                    mProducerSequenceFactory
+                        .getPostprocessorSequences()
+                        .get(mProducerSequenceFactory.getNetworkFetchSequence())));
   }
 
   private void internalUseSequenceFactoryWithBitmapPrepare() {
@@ -386,7 +392,10 @@ public class ProducerSequenceFactoryTest {
             false,
             false,
             null,
-            5);
+            5,
+            false,
+            false,
+            false);
   }
 
   private void internalUseSequenceFactoryWithCustomSequence(
@@ -410,7 +419,10 @@ public class ProducerSequenceFactoryTest {
             false,
             false,
             Collections.singleton(customProducerSequenceFactory),
-            5);
+            5,
+            false,
+            false,
+            false);
   }
 
   private static class RecordingCustomProducerSequenceFactoryIsCalled

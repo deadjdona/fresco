@@ -99,14 +99,15 @@ class ShowcaseApplication : Application() {
     CustomImageFormatConfigurator.addCustomDrawableFactories(this, draweeConfigBuilder)
 
     draweeConfigBuilder.setDebugOverlayEnabledSupplier(
-        DebugOverlaySupplierSingleton.getInstance(applicationContext))
+        DebugOverlaySupplierSingleton.getInstance(applicationContext)
+    )
 
     if (shouldEnableFlipper()) {
       draweeConfigBuilder.setImagePerfDataListener(
           object : ImagePerfDataListener {
             override fun onImageLoadStatusUpdated(
                 imagePerfData: ImagePerfData,
-                imageLoadStatus: ImageLoadStatus
+                imageLoadStatus: ImageLoadStatus,
             ) {
               frescoFlipperPlugin
                   ?.flipperImageTracker
@@ -116,11 +117,12 @@ class ShowcaseApplication : Application() {
 
             override fun onImageVisibilityUpdated(
                 imagePerfData: ImagePerfData,
-                visibilityState: VisibilityState
+                visibilityState: VisibilityState,
             ) {
               // nop
             }
-          })
+          }
+      )
     }
 
     Fresco.initialize(this, imagePipelineConfig, draweeConfigBuilder.build())
@@ -128,7 +130,10 @@ class ShowcaseApplication : Application() {
     initVito(resources)
     imageSelector =
         ImageSelector(
-            imageTracker, FrescoVitoProvider.getImagePipeline(), FrescoVitoProvider.getController())
+            imageTracker,
+            FrescoVitoProvider.getImagePipeline(),
+            FrescoVitoProvider.getController(),
+        )
     val context = this
     Stetho.initialize(
         Stetho.newInitializerBuilder(context)
@@ -136,7 +141,8 @@ class ShowcaseApplication : Application() {
               Stetho.DefaultDumperPluginsBuilder(context).provide(FrescoStethoPlugin()).finish()
             }
             .enableWebKitInspector(Stetho.defaultInspectorModulesProvider(context))
-            .build())
+            .build()
+    )
 
     if (shouldEnableFlipper()) {
       SoLoader.init(this, 0)
@@ -149,9 +155,11 @@ class ShowcaseApplication : Application() {
               NoOpDebugMemoryManager(),
               NoOpFlipperPerfLogger(),
               null,
-              null)
+              null,
+          )
       forwardingRequestListener.addRequestListener(
-          FrescoFlipperRequestListener(frescoFlipperPlugin!!.flipperImageTracker))
+          FrescoFlipperRequestListener(frescoFlipperPlugin!!.flipperImageTracker)
+      )
       AndroidFlipperClient.getInstance(context).apply {
         addPlugin(InspectorFlipperPlugin(context, DescriptorMapping.withDefaults()))
         addPlugin(frescoFlipperPlugin)
@@ -177,13 +185,16 @@ class ShowcaseApplication : Application() {
                   .executorSupplier
                   .forLightweightBackgroundTasks(),
               NoOpCallerContextVerifier,
-              DebugOverlayHandler(DebugOverlaySupplierSingleton.getInstance(applicationContext))))
+              DebugOverlayHandler(DebugOverlaySupplierSingleton.getInstance(applicationContext)),
+          )
+      )
     } else {
       FrescoVito.initialize(
           vitoConfig = vitoConfig,
           debugOverlayEnabledSupplier =
               DebugOverlaySupplierSingleton.getInstance(applicationContext),
-          vitoImagePerfListener = imageTracker)
+          vitoImagePerfListener = imageTracker,
+      )
     }
   }
 

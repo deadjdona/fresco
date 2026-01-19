@@ -22,13 +22,13 @@ import com.facebook.fresco.vito.core.impl.StringDebugDataProvider
 
 class LiveEditorUiUtils(
     var liveEditor: ImageLiveEditor?,
-    var debugDataProviders: List<StringDebugDataProvider>? = null
+    var debugDataProviders: List<StringDebugDataProvider>? = null,
 ) {
 
   fun createView(
       context: Context,
       customEntries: List<ImageOptionsSampleValues.Entry<out Any>> = emptyList(),
-      closeAction: ((View) -> Unit)? = null
+      closeAction: ((View) -> Unit)? = null,
   ): View =
       createScrollingList(context, closeAction) {
         addView(createWithList(context, ImageSourceSampleValues.entries))
@@ -41,7 +41,8 @@ class LiveEditorUiUtils(
         addView(createWithList(context, ImageOptionsSampleValues.bitmapConfig))
         addView(createWithList(context, ImageOptionsSampleValues.resizeToViewportConfig))
         addView(
-            createWithList(context, ImageOptionsSampleValues.localThumbnailPreviewsEnabledConfig))
+            createWithList(context, ImageOptionsSampleValues.localThumbnailPreviewsEnabledConfig)
+        )
         addView(createWithList(context, ImageOptionsSampleValues.progressiveRenderingEnabledConfig))
         addView(createWithList(context, ImageOptionsSampleValues.placeholderColors))
 
@@ -51,23 +52,28 @@ class LiveEditorUiUtils(
   private fun createScrollingList(
       context: Context,
       closeAction: ((View) -> Unit)? = null,
-      block: LinearLayout.() -> Unit
+      block: LinearLayout.() -> Unit,
   ): View =
       ScrollView(context).apply {
         layoutParams =
             LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
         addView(
             LinearLayout(context).apply {
               layoutParams =
                   LinearLayout.LayoutParams(
-                      ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                      ViewGroup.LayoutParams.MATCH_PARENT,
+                      ViewGroup.LayoutParams.WRAP_CONTENT,
+                  )
               orientation = LinearLayout.VERTICAL
               if (closeAction != null) {
                 addView(createButton(context, "Close", closeAction))
               }
               block(this)
-            })
+            }
+        )
       }
 
   fun createImageInfoView(context: Context, closeAction: (View) -> Unit): View =
@@ -75,17 +81,17 @@ class LiveEditorUiUtils(
         var source: List<Pair<String, String>> =
             ImageSourceParser.convertSourceToKeyValue(liveEditor?.getSource().toString())
         liveEditor?.let { liveEditorNonNull ->
-          debugDataProviders?.forEach {
+          debugDataProviders?.forEach { debugProvider ->
             val debugData: Pair<String, String> =
-                Pair(it.longName, it.extractData(liveEditorNonNull.drawable))
+                Pair(debugProvider.longName, debugProvider.extractData(liveEditorNonNull.drawable))
             source = source + debugData
           }
         }
         if (source.isEmpty()) {
           addView(TextView(context).apply { text = "Source is Empty" })
         }
-        source.forEach {
-          val view = ImageSourceUiUtil(context).createImageInfoView(it, this)
+        source.forEach { sourceInfo ->
+          val view = ImageSourceUiUtil(context).createImageInfoView(sourceInfo, this)
           addView(view)
         }
       }
@@ -99,14 +105,15 @@ class LiveEditorUiUtils(
 
   private fun <T> createWithList(
       context: Context,
-      entry: ImageOptionsSampleValues.Entry<T>
+      entry: ImageOptionsSampleValues.Entry<T>,
   ): Spinner {
     return Spinner(context).apply {
       adapter =
           ArrayAdapter(
               context,
               android.R.layout.simple_spinner_dropdown_item,
-              listOf(entry.name + ": original") + entry.data.map { entry.name + ": " + it.first })
+              listOf(entry.name + ": original") + entry.data.map { entry.name + ": " + it.first },
+          )
       onItemSelectedListener =
           object : AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(p0: AdapterView<*>?) = Unit
@@ -115,7 +122,7 @@ class LiveEditorUiUtils(
                 parent: AdapterView<*>?,
                 view: View?,
                 position: Int,
-                id: Long
+                id: Long,
             ) {
               if (position > 0) {
                 liveEditor?.editOptions(context) {
@@ -129,14 +136,15 @@ class LiveEditorUiUtils(
 
   private fun <T> createWithList(
       context: Context,
-      entry: ImageSourceSampleValues.Entry<T>
+      entry: ImageSourceSampleValues.Entry<T>,
   ): Spinner {
     return Spinner(context).apply {
       adapter =
           ArrayAdapter(
               context,
               android.R.layout.simple_spinner_dropdown_item,
-              listOf(entry.name + ": original") + entry.data.map { entry.name + ": " + it.first })
+              listOf(entry.name + ": original") + entry.data.map { entry.name + ": " + it.first },
+          )
       onItemSelectedListener =
           object : AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(p0: AdapterView<*>?) = Unit
@@ -145,7 +153,7 @@ class LiveEditorUiUtils(
                 parent: AdapterView<*>?,
                 view: View?,
                 position: Int,
-                id: Long
+                id: Long,
             ) {
               if (position == 0) {
                 liveEditor?.editSource(context) { liveEditor?.getOriginalSource() ?: it }
@@ -162,7 +170,10 @@ class LiveEditorUiUtils(
   companion object {
     internal fun Int.dpToPxF(context: Context): Float =
         TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, this.toFloat(), context.resources.displayMetrics)
+            TypedValue.COMPLEX_UNIT_DIP,
+            this.toFloat(),
+            context.resources.displayMetrics,
+        )
 
     internal fun Int.dpToPx(context: Context): Int = dpToPxF(context).toInt()
   }

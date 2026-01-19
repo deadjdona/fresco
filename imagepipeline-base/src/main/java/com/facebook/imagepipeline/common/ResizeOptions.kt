@@ -28,7 +28,7 @@ constructor(
     /* max supported bitmap size (in pixels), defaults to BitmapUtil.MAX_BITMAP_DIMENSION */
     @JvmField val maxBitmapDimension: Float = BitmapUtil.MAX_BITMAP_DIMENSION,
     /* round-up fraction for resize process, defaults to DEFAULT_ROUNDUP_FRACTION */
-    @JvmField val roundUpFraction: Float = DEFAULT_ROUNDUP_FRACTION
+    @JvmField val roundUpFraction: Float = DEFAULT_ROUNDUP_FRACTION,
 ) {
 
   init {
@@ -49,7 +49,7 @@ constructor(
 
   companion object {
 
-    const val DEFAULT_ROUNDUP_FRACTION = 2.0f / 3
+    const val DEFAULT_ROUNDUP_FRACTION: Float = 2.0f / 3
 
     /** @return new ResizeOptions, if the width and height values are valid, and null otherwise */
     @JvmStatic

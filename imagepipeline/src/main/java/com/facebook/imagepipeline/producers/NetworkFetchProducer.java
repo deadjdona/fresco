@@ -14,6 +14,7 @@ import com.facebook.common.memory.PooledByteBuffer;
 import com.facebook.common.memory.PooledByteBufferFactory;
 import com.facebook.common.memory.PooledByteBufferOutputStream;
 import com.facebook.common.references.CloseableReference;
+import com.facebook.fresco.middleware.HasExtraData;
 import com.facebook.imagepipeline.common.BytesRange;
 import com.facebook.imagepipeline.decoder.ProgressiveJpegConfig;
 import com.facebook.imagepipeline.image.EncodedImage;
@@ -153,7 +154,8 @@ public class NetworkFetchProducer implements Producer<EncodedImage> {
           fetchState.getOnNewResultStatusFlags(),
           fetchState.getResponseBytesRange(),
           fetchState.getConsumer(),
-          fetchState.getContext());
+          fetchState.getContext(),
+          fetchState.getQuery());
     }
   }
 
@@ -169,7 +171,8 @@ public class NetworkFetchProducer implements Producer<EncodedImage> {
         Consumer.IS_LAST | fetchState.getOnNewResultStatusFlags(),
         fetchState.getResponseBytesRange(),
         fetchState.getConsumer(),
-        fetchState.getContext());
+        fetchState.getContext(),
+        fetchState.getQuery());
   }
 
   protected static void notifyConsumer(
@@ -177,14 +180,20 @@ public class NetworkFetchProducer implements Producer<EncodedImage> {
       @Consumer.Status int status,
       @Nullable BytesRange responseBytesRange,
       Consumer<EncodedImage> consumer,
-      ProducerContext context) {
+      ProducerContext context,
+      @Nullable String query) {
     CloseableReference<PooledByteBuffer> result =
         CloseableReference.of(pooledOutputStream.toByteBuffer());
     EncodedImage encodedImage = null;
     try {
       encodedImage = new EncodedImage(result);
       encodedImage.setBytesRange(responseBytesRange);
+      encodedImage.putExtra(HasExtraData.KEY_SF_QUERY, query);
       encodedImage.parseMetaData();
+      context.putExtra(HasExtraData.KEY_ENCODED_SIZE, encodedImage.getSize());
+      context.putExtra(HasExtraData.KEY_ENCODED_WIDTH, encodedImage.getWidth());
+      context.putExtra(HasExtraData.KEY_ENCODED_HEIGHT, encodedImage.getHeight());
+      context.putExtra(HasExtraData.KEY_SF_QUERY, query);
       consumer.onNewResult(encodedImage, status);
     } finally {
       EncodedImage.closeSafely(encodedImage);
@@ -213,7 +222,7 @@ public class NetworkFetchProducer implements Producer<EncodedImage> {
   private boolean shouldPropagateIntermediateResults(
       FetchState fetchState, ProducerContext context) {
     ProgressiveJpegConfig pjpegConfig = context.getImagePipelineConfig().getProgressiveJpegConfig();
-    if (pjpegConfig == null || !pjpegConfig.decodeProgressively()) {
+    if (pjpegConfig == null || !pjpegConfig.decodeProgressively(context.getImageRequest())) {
       return false;
     }
     if (!fetchState.getContext().isIntermediateResultExpected()) {

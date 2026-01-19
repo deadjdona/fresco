@@ -20,7 +20,7 @@ import kotlin.math.min
 class CircularBorderBitmapDrawable(
     res: Resources?,
     bitmap: Bitmap?,
-    private var borderOptions: BorderOptions? = null
+    private var borderOptions: BorderOptions? = null,
 ) : BitmapDrawable(res, bitmap) {
 
   private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -81,9 +81,9 @@ class CircularBorderBitmapDrawable(
   }
 
   private fun ensureBorderPaint() {
-    borderOptions?.let {
-      borderPaint.strokeWidth = it.width
-      borderPaint.color = DrawableUtils.multiplyColorAlpha(it.color, _alpha)
+    borderOptions?.let { options ->
+      borderPaint.strokeWidth = options.width
+      borderPaint.color = DrawableUtils.multiplyColorAlpha(options.color, _alpha)
     }
   }
 }

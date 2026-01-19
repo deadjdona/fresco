@@ -33,6 +33,7 @@ import com.facebook.imagepipeline.listener.RequestListener
 import com.facebook.imagepipeline.listener.RequestListener2
 import com.facebook.imagepipeline.memory.PoolFactory
 import com.facebook.imagepipeline.producers.CustomProducerSequenceFactory
+import com.facebook.imagepipeline.producers.DecodeProducer
 import com.facebook.imagepipeline.producers.NetworkFetcher
 import com.facebook.imagepipeline.transcoder.ImageTranscoderFactory
 
@@ -93,6 +94,8 @@ interface ImagePipelineConfigInterface {
   val executorServiceForAnimatedImages: SerialExecutorService?
   val isPrefetchEnabledSupplier: Supplier<Boolean>
   val callerContextVerifier: CallerContextVerifier?
+  val decodedOriginalImageAnalyzers: Set<DecodeProducer.DecodedOriginalImageAnalyzer>
+  val isAppStarting: (() -> Boolean)?
 
   // Experiments
   val experiments: ImagePipelineExperiments

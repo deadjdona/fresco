@@ -115,16 +115,16 @@ class FlipperImageTracker : DebugImageTracker, ImagePerfDataListener {
   @Synchronized
   override fun onImageLoadStatusUpdated(
       imagePerfData: ImagePerfData,
-      imageLoadStatus: ImageLoadStatus
+      imageLoadStatus: ImageLoadStatus,
   ) {
-    if (imagePerfData?.imageRequest == null) {
+    if (imagePerfData.imageRequest == null) {
       return
     }
     val debugData = imageRequestDebugDataMap[imagePerfData.imageRequest]
     if (debugData != null) {
       debugData.imagePerfData = imagePerfData
     } else {
-      val imageRequest = imagePerfData?.imageRequest as? ImageRequest
+      val imageRequest = imagePerfData.imageRequest as? ImageRequest
       val imageDebugData = ImageDebugData(imageRequest)
       imageDebugData.imagePerfData = imagePerfData
       imageRequestDebugDataMap[imageRequest] = imageDebugData
@@ -134,7 +134,7 @@ class FlipperImageTracker : DebugImageTracker, ImagePerfDataListener {
   @Synchronized
   override fun onImageVisibilityUpdated(
       imagePerfData: ImagePerfData,
-      visibilityState: VisibilityState
+      visibilityState: VisibilityState,
   ) {
     // ignore
   }

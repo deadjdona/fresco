@@ -11,7 +11,7 @@ package com.facebook.fresco.vito.source
 data class IncreasingQualityImageSource(
     val lowResSource: ImageSource,
     val highResSource: ImageSource,
-    val extras: Map<String, Any>? = null
+    val extras: Map<String, Any>? = null,
 ) : ImageSource {
 
   fun getExtra(key: String): Any? = extras?.get(key)
@@ -39,4 +39,6 @@ data class IncreasingQualityImageSource(
     result = 31 * result + (extras?.hashCode() ?: 0)
     return result
   }
+
+  override fun getClassNameString(): String = "IncreasingQualityImageSource"
 }

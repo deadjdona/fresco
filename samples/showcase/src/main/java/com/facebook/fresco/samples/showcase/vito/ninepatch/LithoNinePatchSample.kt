@@ -21,14 +21,15 @@ class LithoNinePatchSample : LithoSample {
   override fun createLithoComponent(
       c: ComponentContext,
       uris: ImageUriProvider,
-      callerContext: Any
+      callerContext: Any,
   ): Component {
     val imageOptions =
         ImageOptions.create()
             .imageDecodeOptions(
                 ImageDecodeOptions.newBuilder()
                     .setCustomImageDecoder(NinePatchExample.NinePatchDecoder())
-                    .build())
+                    .build()
+            )
             .customDrawableFactory(NinePatchExample.NinePatchDrawableFactory(c.resources))
             .scale(ScalingUtils.ScaleType.FIT_XY)
             .build()

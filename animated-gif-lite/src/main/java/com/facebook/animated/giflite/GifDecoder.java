@@ -12,7 +12,7 @@ import com.facebook.animated.giflite.decoder.GifMetadataDecoder;
 import com.facebook.animated.giflite.draw.MovieAnimatedImage;
 import com.facebook.animated.giflite.draw.MovieDrawer;
 import com.facebook.animated.giflite.draw.MovieFrame;
-import com.facebook.common.preconditions.Preconditions;
+import com.facebook.common.internal.Preconditions;
 import com.facebook.imagepipeline.animated.base.AnimatedDrawableFrameInfo;
 import com.facebook.imagepipeline.animated.base.AnimatedImageResult;
 import com.facebook.imagepipeline.common.ImageDecodeOptions;
@@ -45,11 +45,11 @@ public class GifDecoder implements ImageDecoder {
       GifMetadataDecoder decoder = GifMetadataDecoder.create(is, out);
 
       if (out.size() > 0) { // let's use the fixed gif version if exists
-        Preconditions.checkNotNull(is).close();
+        Preconditions.checkNotNull(is, "InputStream cannot be null").close();
         is = new ByteArrayInputStream(out.toByteArray());
       }
 
-      Preconditions.checkNotNull(is).reset();
+      Preconditions.checkNotNull(is, "InputStream cannot be null").reset();
 
       Movie movie = Movie.decodeStream(is);
 
@@ -82,7 +82,7 @@ public class GifDecoder implements ImageDecoder {
       throw new RuntimeException("Error while decoding gif", e);
     } finally {
       try {
-        Preconditions.checkNotNull(is).close();
+        Preconditions.checkNotNull(is, "InputStream cannot be null").close();
       } catch (IOException ignored) {
       }
     }

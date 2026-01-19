@@ -65,7 +65,11 @@ internal object TiffUtil {
     // move to the entry with orientation tag
     remainingLength =
         moveToTiffEntryWithTag(
-            stream, remainingLength, tiffHeader.isLittleEndian, TIFF_TAG_ORIENTATION)
+            stream,
+            remainingLength,
+            tiffHeader.isLittleEndian,
+            TIFF_TAG_ORIENTATION,
+        )
 
     // read orientation
     return getOrientationFromTiffEntry(stream, remainingLength, tiffHeader.isLittleEndian)
@@ -90,8 +94,10 @@ internal object TiffUtil {
     // read the byte order
     tiffHeader.byteOrder = StreamProcessor.readPackedInt(stream, 4, false)
     remainingLength -= 4
-    if (tiffHeader.byteOrder != TIFF_BYTE_ORDER_LITTLE_END &&
-        tiffHeader.byteOrder != TIFF_BYTE_ORDER_BIG_END) {
+    if (
+        tiffHeader.byteOrder != TIFF_BYTE_ORDER_LITTLE_END &&
+            tiffHeader.byteOrder != TIFF_BYTE_ORDER_BIG_END
+    ) {
       FLog.e(TAG, "Invalid TIFF header")
       return 0
     }
@@ -121,7 +127,7 @@ internal object TiffUtil {
       stream: InputStream,
       length: Int,
       isLittleEndian: Boolean,
-      tagToFind: Int
+      tagToFind: Int,
   ): Int {
     if (length < 14) {
       return 0
@@ -159,7 +165,7 @@ internal object TiffUtil {
   private fun getOrientationFromTiffEntry(
       stream: InputStream,
       length: Int,
-      isLittleEndian: Boolean
+      isLittleEndian: Boolean,
   ): Int {
     if (length < 10) {
       return 0

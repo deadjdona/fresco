@@ -29,10 +29,8 @@ dependencies {
     testImplementation TestDeps.assertjCore
     testImplementation TestDeps.junit
     testImplementation TestDeps.festAssertCore
-    testImplementation TestDeps.mockitoCore
-    testImplementation TestDeps.Powermock.apiMockito
-    testImplementation TestDeps.Powermock.moduleJunit4Rule
-    testImplementation TestDeps.Powermock.classloadingXstream
+    testImplementation TestDeps.mockitoCore3
+    testImplementation TestDeps.mockitoInline3
     testImplementation(TestDeps.robolectric) {
         exclude group: 'com.android.support', module: 'support-v4'
         exclude group: 'commons-logging', module: 'commons-logging'

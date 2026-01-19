@@ -7,7 +7,7 @@
 
 package com.facebook.animated.giflite.decoder;
 
-import com.facebook.common.preconditions.Preconditions;
+import com.facebook.common.internal.Preconditions;
 import com.facebook.infer.annotation.Nullsafe;
 import java.io.EOFException;
 import java.io.IOException;
@@ -32,6 +32,8 @@ public class GifMetadataDecoder {
   private final InputStream mInputStream;
   @Nullable private final OutputStream mOutputStream;
   private boolean shouldFixStream;
+  private int screenWidth;
+  private int screenHeight;
   private final List<int[]> mFrameControls = new ArrayList<>();
   private int mLoopCount = 1; // default loop count is 1
   private boolean mDecoded = false;
@@ -59,6 +61,20 @@ public class GifMetadataDecoder {
     }
     mDecoded = true;
     readGifInfo();
+  }
+
+  public int getScreenWidth() {
+    if (!mDecoded) {
+      throw new IllegalStateException("getScreenWidth called before decode");
+    }
+    return screenWidth;
+  }
+
+  public int getScreenHeight() {
+    if (!mDecoded) {
+      throw new IllegalStateException("getScreenHeight called before decode");
+    }
+    return screenHeight;
   }
 
   public int getFrameCount() {
@@ -158,7 +174,8 @@ public class GifMetadataDecoder {
       throw new IOException("Illegal header for gif");
     }
 
-    skipAndWriteBytes(4); // width, height
+    screenWidth = readAndWriteNextByte() | (readAndWriteNextByte() << 8);
+    screenHeight = readAndWriteNextByte() | (readAndWriteNextByte() << 8);
 
     int fields = readAndWriteNextByte();
     boolean hasGlobalColorTable = (fields & 0x80) != 0;
@@ -275,7 +292,8 @@ public class GifMetadataDecoder {
 
   private void writeNextByte(int b) throws IOException {
     if (shouldFixStream) {
-      Preconditions.checkNotNull(mOutputStream).write(b);
+      Preconditions.checkNotNull(mOutputStream, "OutputStream cannot be null when fixing stream")
+          .write(b);
     }
   }
 

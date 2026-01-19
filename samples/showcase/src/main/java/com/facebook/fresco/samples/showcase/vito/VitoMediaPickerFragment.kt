@@ -9,7 +9,6 @@ package com.facebook.fresco.samples.showcase.drawee
 
 import android.app.Activity
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.LayoutInflater
@@ -17,7 +16,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
 import com.facebook.fresco.samples.showcase.BaseShowcaseFragment
 import com.facebook.fresco.samples.showcase.R
 import com.facebook.fresco.samples.showcase.permissions.StoragePermissionHelper.withStoragePermission
@@ -29,7 +27,7 @@ import com.facebook.fresco.vito.view.VitoView
 class VitoMediaPickerFragment : BaseShowcaseFragment() {
   private lateinit var imageView: ImageView
   private lateinit var imagePath: TextView
-  private var callerContext: String = "VitoMediaPickerFragment"
+  private val callerContext: String = "VitoMediaPickerFragment"
   private val imageOptions: ImageOptions =
       ImageOptions.create()
           .errorRes(R.color.error_color)
@@ -39,7 +37,7 @@ class VitoMediaPickerFragment : BaseShowcaseFragment() {
   override fun onCreateView(
       inflater: LayoutInflater,
       container: ViewGroup?,
-      savedInstanceState: Bundle?
+      savedInstanceState: Bundle?,
   ): View? {
     return inflater.inflate(R.layout.fragment_vito_media_picker, container, false)
   }
@@ -50,18 +48,10 @@ class VitoMediaPickerFragment : BaseShowcaseFragment() {
 
     val actionOpenDocumentButton = view.findViewById<View>(R.id.pick_action_open_document)
     actionOpenDocumentButton.setOnClickListener {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-        intent.addCategory(Intent.CATEGORY_OPENABLE)
-        intent.setType("image/*")
-        startActivityForResult(intent, REQUEST_CODE_PICK_MEDIA)
-      } else {
-        Toast.makeText(
-                context,
-                R.string.drawee_media_picker_action_open_document_not_supported,
-                Toast.LENGTH_SHORT)
-            .show()
-      }
+      val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+      intent.addCategory(Intent.CATEGORY_OPENABLE)
+      intent.setType("image/*")
+      startActivityForResult(intent, REQUEST_CODE_PICK_MEDIA)
     }
     val actionGetContent = view.findViewById<View>(R.id.pick_action_get_content)
     actionGetContent.setOnClickListener {

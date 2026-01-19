@@ -10,6 +10,7 @@ package com.facebook.fresco.vito.source
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.util.LruCache
 import com.facebook.fresco.middleware.HasExtraData
 
 /**
@@ -22,13 +23,30 @@ object ImageSourceProvider {
    * Uri parsing function from String to URI. The default implementation can be replaced with any
    * custom URI parsing logic if required.
    */
-  var uriParser: (String) -> Uri? = {
-    val uri: Uri = Uri.parse(it)
+  var uriParser: (String) -> Uri? = { uriString ->
+    val uri: Uri = Uri.parse(uriString)
     uri
   }
 
+  var shortcutResUris: Boolean = false
+
+  var uriCacheSize: Int = 0
+
+  val uriCache: LruCache<String, Uri>? by
+      lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        val size = uriCacheSize
+        if (size > 0) {
+          LruCache(uriCacheSize.toInt())
+        } else {
+          null
+        }
+      }
+
+  private val emptyImageSource = EmptyImageSource("emptySource()")
+  private val nullUriImageSource = EmptyImageSource("forUri(null)")
+
   /** @return an empty image source if no image URI is available to pass to the UI component */
-  @JvmStatic fun emptySource(): ImageSource = EmptyImageSource
+  @JvmStatic fun emptySource(): ImageSource = emptyImageSource
 
   /**
    * Create a single image source for a given image URI.
@@ -40,7 +58,10 @@ object ImageSourceProvider {
   @JvmStatic
   fun forUri(uri: Uri?, extras: Map<String, Any>? = null): ImageSource =
       if (uri == null) {
-        emptySource()
+        nullUriImageSource
+      } else if (shortcutResUris && uri.scheme == "res") {
+        val resId = uri.lastPathSegment?.toInt() ?: 0
+        DrawableResImageSource(resId)
       } else {
         SingleImageSourceImpl(
             uri,
@@ -49,7 +70,8 @@ object ImageSourceProvider {
                 putAll(extras)
               }
               put(HasExtraData.KEY_URI_SOURCE, uri)
-            })
+            },
+        )
       }
 
   /**
@@ -61,7 +83,18 @@ object ImageSourceProvider {
   @JvmOverloads
   @JvmStatic
   fun forUri(uriString: String?, extras: Map<String, Any>? = null): ImageSource {
+    if (uriString != null) {
+      val cached: Uri? = uriCache?.get(uriString)
+      if (cached != null) {
+        return forUri(cached, extras)
+      }
+    }
+
     val uri: Uri? = uriString?.let { uriParser(it) }
+    if (uri != null) {
+      uriCache?.put(uriString, uri)
+    }
+
     return forUri(uri, extras)
   }
 
@@ -89,7 +122,7 @@ object ImageSourceProvider {
   @JvmStatic
   fun increasingQuality(
       lowResImageSource: ImageSource,
-      highResImageSource: ImageSource
+      highResImageSource: ImageSource,
   ): ImageSource = IncreasingQualityImageSource(lowResImageSource, highResImageSource, null)
 
   /**
@@ -106,7 +139,7 @@ object ImageSourceProvider {
   fun increasingQuality(
       lowResImageSource: ImageSource,
       highResImageSource: ImageSource,
-      extras: Map<String, Any>? = null
+      extras: Map<String, Any>? = null,
   ): ImageSource = IncreasingQualityImageSource(lowResImageSource, highResImageSource, extras)
 
   /**

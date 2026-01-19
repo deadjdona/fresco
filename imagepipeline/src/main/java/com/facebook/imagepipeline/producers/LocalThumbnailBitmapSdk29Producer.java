@@ -44,10 +44,19 @@ public class LocalThumbnailBitmapSdk29Producer
 
   private final Executor mExecutor;
   private final ContentResolver mContentResolver;
+  private final Boolean mLoadThumbnailFromContentResolverFirst;
+  private final Boolean mLoadThumbnailFromContentResolverForContentUriOnly;
 
-  public LocalThumbnailBitmapSdk29Producer(Executor executor, ContentResolver contentResolver) {
+  public LocalThumbnailBitmapSdk29Producer(
+      Executor executor,
+      ContentResolver contentResolver,
+      Boolean loadThumbnailFromContentResolverFirst,
+      Boolean loadThumbnailFromContentResolverForContentUriOnly) {
     mExecutor = executor;
     mContentResolver = contentResolver;
+    mLoadThumbnailFromContentResolverFirst = loadThumbnailFromContentResolverFirst;
+    mLoadThumbnailFromContentResolverForContentUriOnly =
+        loadThumbnailFromContentResolverForContentUriOnly;
   }
 
   @Override
@@ -81,27 +90,53 @@ public class LocalThumbnailBitmapSdk29Producer
             String path;
             Size size =
                 new Size(imageRequest.getPreferredWidth(), imageRequest.getPreferredHeight());
-            try {
-              path = getLocalFilePath(imageRequest);
-            } catch (IllegalArgumentException e) {
-              path = null;
-            }
 
-            if (path != null) {
-              thumbnailBitmap =
-                  MediaUtils.isVideo(MediaUtils.extractMime(path))
-                      ? ThumbnailUtils.createVideoThumbnail(
-                          new File(path), size, cancellationSignal)
-                      : ThumbnailUtils.createImageThumbnail(
-                          new File(path), size, cancellationSignal);
-            }
+            if (mLoadThumbnailFromContentResolverFirst) {
+              // Use content resolver only for non file URIs
+              if (!mLoadThumbnailFromContentResolverForContentUriOnly
+                  || "content".equals(imageRequest.getSourceUri().getScheme())) {
+                thumbnailBitmap =
+                    mContentResolver.loadThumbnail(
+                        imageRequest.getSourceUri(), size, cancellationSignal);
+              }
 
-            if (thumbnailBitmap == null) {
-              thumbnailBitmap =
-                  mContentResolver.loadThumbnail(
-                      imageRequest.getSourceUri(), size, cancellationSignal);
-            }
+              if (thumbnailBitmap == null) {
+                try {
+                  path = getLocalFilePath(imageRequest);
+                } catch (IllegalArgumentException e) {
+                  path = null;
+                }
+                if (path != null) {
+                  thumbnailBitmap =
+                      MediaUtils.isVideo(MediaUtils.extractMime(path))
+                          ? ThumbnailUtils.createVideoThumbnail(
+                              new File(path), size, cancellationSignal)
+                          : ThumbnailUtils.createImageThumbnail(
+                              new File(path), size, cancellationSignal);
+                }
+              }
+            } else {
+              try {
+                path = getLocalFilePath(imageRequest);
+              } catch (IllegalArgumentException e) {
+                path = null;
+              }
 
+              if (path != null) {
+                thumbnailBitmap =
+                    MediaUtils.isVideo(MediaUtils.extractMime(path))
+                        ? ThumbnailUtils.createVideoThumbnail(
+                            new File(path), size, cancellationSignal)
+                        : ThumbnailUtils.createImageThumbnail(
+                            new File(path), size, cancellationSignal);
+              }
+
+              if (thumbnailBitmap == null) {
+                thumbnailBitmap =
+                    mContentResolver.loadThumbnail(
+                        imageRequest.getSourceUri(), size, cancellationSignal);
+              }
+            }
             if (thumbnailBitmap == null) {
               return null;
             }

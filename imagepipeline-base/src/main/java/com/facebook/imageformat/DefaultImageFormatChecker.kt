@@ -32,7 +32,8 @@ class DefaultImageFormatChecker : FormatChecker {
                   BINARY_XML_HEADER_LENGTH,
                   AVIF_HEADER_LENGTH,
               )
-              .maxOrNull())
+              .maxOrNull()
+      )
 
   /**
    * Tries to match imageHeaderByte and headerSize against every known image format. If any match
@@ -140,7 +141,8 @@ class DefaultImageFormatChecker : FormatChecker {
             0x0D.toByte(),
             0x0A.toByte(),
             0x1A.toByte(),
-            0x0A.toByte())
+            0x0A.toByte(),
+        )
     private val PNG_HEADER_LENGTH = PNG_HEADER.size
 
     /**
@@ -233,7 +235,8 @@ class DefaultImageFormatChecker : FormatChecker {
             ImageFormatCheckerUtils.asciiBytes("hevc"),
             ImageFormatCheckerUtils.asciiBytes("hevx"),
             ImageFormatCheckerUtils.asciiBytes("mif1"),
-            ImageFormatCheckerUtils.asciiBytes("msf1"))
+            ImageFormatCheckerUtils.asciiBytes("msf1"),
+        )
     private const val HEIF_HEADER_LENGTH = 12
 
     /**

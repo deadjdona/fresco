@@ -44,14 +44,18 @@ class ProducerSequenceFactory(
     private val isDiskCacheProbingEnabled: Boolean,
     private val allowDelay: Boolean,
     private val customProducerSequenceFactories: Set<CustomProducerSequenceFactory>?,
-    private val localImageThrottlingMaxSimultaneousRequests: Long
+    private val localImageThrottlingMaxSimultaneousRequests: Long,
+    private val loadThumbnailFromContentResolverFirst: Boolean,
+    private val loadThumbnailFromContentResolverForContentUriOnly: Boolean,
+    private val usePostprocessorDuringDecodedPrefetch: Boolean,
 ) {
 
   @VisibleForTesting
   var postprocessorSequences:
       MutableMap<
           Producer<CloseableReference<CloseableImage>>,
-          Producer<CloseableReference<CloseableImage>>> =
+          Producer<CloseableReference<CloseableImage>>,
+      > =
       mutableMapOf()
 
   @VisibleForTesting
@@ -63,7 +67,8 @@ class ProducerSequenceFactory(
   var bitmapPrepareSequences:
       MutableMap<
           Producer<CloseableReference<CloseableImage>>,
-          Producer<CloseableReference<CloseableImage>>> =
+          Producer<CloseableReference<CloseableImage>>,
+      > =
       mutableMapOf()
 
   /**
@@ -90,7 +95,11 @@ class ProducerSequenceFactory(
               for (customProducerSequenceFactory in customProducerSequenceFactories) {
                 val sequence =
                     customProducerSequenceFactory.getCustomEncodedImageSequence(
-                        imageRequest, this, producerFactory, threadHandoffProducerQueue)
+                        imageRequest,
+                        this,
+                        producerFactory,
+                        threadHandoffProducerQueue,
+                    )
                 if (sequence != null) {
                   return sequence
                 }
@@ -98,7 +107,8 @@ class ProducerSequenceFactory(
             }
             throw IllegalArgumentException(
                 "Unsupported uri scheme for encoded image fetch! Uri is: " +
-                    getShortenedUriString(uri))
+                    getShortenedUriString(uri)
+            )
           }
         }
       }
@@ -127,9 +137,10 @@ class ProducerSequenceFactory(
   val localContentUriFetchEncodedImageProducerSequence:
       Producer<CloseableReference<PooledByteBuffer>> by lazy {
     traceSection(
-        "ProducerSequenceFactory#getLocalContentUriFetchEncodedImageProducerSequence:init") {
-          RemoveImageTransformMetaDataProducer(backgroundLocalContentUriFetchToEncodeMemorySequence)
-        }
+        "ProducerSequenceFactory#getLocalContentUriFetchEncodedImageProducerSequence:init"
+    ) {
+      RemoveImageTransformMetaDataProducer(backgroundLocalContentUriFetchToEncodeMemorySequence)
+    }
   }
 
   /**
@@ -150,7 +161,8 @@ class ProducerSequenceFactory(
       else -> {
         val uri = imageRequest.sourceUri
         throw IllegalArgumentException(
-            "Unsupported uri scheme for encoded image fetch! Uri is: " + getShortenedUriString(uri))
+            "Unsupported uri scheme for encoded image fetch! Uri is: " + getShortenedUriString(uri)
+        )
       }
     }
   }
@@ -186,6 +198,9 @@ class ProducerSequenceFactory(
    */
   fun getDecodedImagePrefetchProducerSequence(imageRequest: ImageRequest): Producer<Void?> {
     var inputProducer = getBasicDecodedImageSequence(imageRequest)
+    if (imageRequest.postprocessor != null && usePostprocessorDuringDecodedPrefetch) {
+      inputProducer = getPostprocessorSequence(inputProducer)
+    }
     if (useBitmapPrepareToDraw) {
       inputProducer = getBitmapPrepareSequence(inputProducer)
     }
@@ -236,14 +251,16 @@ class ProducerSequenceFactory(
                         producerFactory,
                         threadHandoffProducerQueue,
                         isEncodedMemoryCacheProbingEnabled,
-                        isDiskCacheProbingEnabled)
+                        isDiskCacheProbingEnabled,
+                    )
                 if (sequence != null) {
                   return sequence
                 }
               }
             }
             throw IllegalArgumentException(
-                "Unsupported uri scheme! Uri is: <${getShortenedUriString(uri)}>")
+                "Unsupported uri scheme! Uri is: <${getShortenedUriString(uri)}> ${customProducerSequenceFactories?.size} custom factories"
+            )
           }
         }
       }
@@ -263,11 +280,13 @@ class ProducerSequenceFactory(
    * background-thread hand-off -> multiplex -> encoded cache -> disk cache -> (webp transcode) ->
    * network fetch.
    */
-  val backgroundNetworkFetchToEncodedMemorySequence: Producer<EncodedImage?> by lazy {
+  val backgroundNetworkFetchToEncodedMemorySequence: Producer<EncodedImage> by lazy {
     traceSection("ProducerSequenceFactory#getBackgroundNetworkFetchToEncodedMemorySequence:init") {
       // Use hand-off producer to ensure that we don't do any unnecessary work on the UI thread.
       producerFactory.newBackgroundThreadHandoffProducer(
-          commonNetworkFetchToEncodedMemorySequence, threadHandoffProducerQueue)
+          commonNetworkFetchToEncodedMemorySequence,
+          threadHandoffProducerQueue,
+      )
     }
   }
 
@@ -293,19 +312,21 @@ class ProducerSequenceFactory(
 
   @Synchronized
   fun newCommonNetworkFetchToEncodedMemorySequence(
-      networkFetcher: NetworkFetcher<*>
+      networkFetcher: NetworkFetcher<*>,
   ): Producer<EncodedImage> =
       traceSection("ProducerSequenceFactory#createCommonNetworkFetchToEncodedMemorySequence") {
         val inputProducer: Producer<EncodedImage> =
             newEncodedCacheMultiplexToTranscodeSequence(
-                producerFactory.newNetworkFetchProducer(networkFetcher))
-        var networkFetchToEncodedMemorySequence: Producer<EncodedImage?> =
+                producerFactory.newNetworkFetchProducer(networkFetcher),
+            )
+        var networkFetchToEncodedMemorySequence: Producer<EncodedImage> =
             ProducerFactory.newAddImageTransformMetaDataProducer(inputProducer)
         networkFetchToEncodedMemorySequence =
             producerFactory.newResizeAndRotateProducer(
                 networkFetchToEncodedMemorySequence,
                 resizeAndRotateEnabledForNetwork && downsampleMode != DownsampleMode.NEVER,
-                imageTranscoderFactory)
+                imageTranscoderFactory,
+            )
         return networkFetchToEncodedMemorySequence
       }
 
@@ -323,13 +344,15 @@ class ProducerSequenceFactory(
    * background-thread hand-off -> multiplex -> encoded cache -> disk cache -> (webp transcode) ->
    * local file fetch
    */
-  val backgroundLocalFileFetchToEncodeMemorySequence: Producer<EncodedImage?> by lazy {
+  val backgroundLocalFileFetchToEncodeMemorySequence: Producer<EncodedImage> by lazy {
     traceSection("ProducerSequenceFactory#getBackgroundLocalFileFetchToEncodeMemorySequence") {
       val localFileFetchProducer = producerFactory.newLocalFileFetchProducer()
       val toEncodedMultiplexProducer =
           newEncodedCacheMultiplexToTranscodeSequence(localFileFetchProducer)
       producerFactory.newBackgroundThreadHandoffProducer(
-          toEncodedMultiplexProducer, threadHandoffProducerQueue)
+          toEncodedMultiplexProducer,
+          threadHandoffProducerQueue,
+      )
     }
   }
 
@@ -337,15 +360,18 @@ class ProducerSequenceFactory(
    * background-thread hand-off -> multiplex -> encoded cache -> disk cache -> (webp transcode) ->
    * local content resolver fetch
    */
-  val backgroundLocalContentUriFetchToEncodeMemorySequence: Producer<EncodedImage?> by lazy {
+  val backgroundLocalContentUriFetchToEncodeMemorySequence: Producer<EncodedImage> by lazy {
     traceSection(
-        "ProducerSequenceFactory#getBackgroundLocalContentUriFetchToEncodeMemorySequence:init") {
-          val localFileFetchProducer = producerFactory.newLocalContentUriFetchProducer()
-          val toEncodedMultiplexProducer =
-              newEncodedCacheMultiplexToTranscodeSequence(localFileFetchProducer)
-          producerFactory.newBackgroundThreadHandoffProducer(
-              toEncodedMultiplexProducer, threadHandoffProducerQueue)
-        }
+        "ProducerSequenceFactory#getBackgroundLocalContentUriFetchToEncodeMemorySequence:init"
+    ) {
+      val localFileFetchProducer = producerFactory.newLocalContentUriFetchProducer()
+      val toEncodedMultiplexProducer =
+          newEncodedCacheMultiplexToTranscodeSequence(localFileFetchProducer)
+      producerFactory.newBackgroundThreadHandoffProducer(
+          toEncodedMultiplexProducer,
+          threadHandoffProducerQueue,
+      )
+    }
   }
 
   /**
@@ -388,7 +414,12 @@ class ProducerSequenceFactory(
   @get:RequiresApi(Build.VERSION_CODES.Q)
   val localThumbnailBitmapSdk29FetchSequence: Producer<CloseableReference<CloseableImage>> by lazy {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      newBitmapCacheGetToBitmapCacheSequence(producerFactory.newLocalThumbnailBitmapSdk29Producer())
+      newBitmapCacheGetToBitmapCacheSequence(
+          producerFactory.newLocalThumbnailBitmapSdk29Producer(
+              loadThumbnailFromContentResolverFirst,
+              loadThumbnailFromContentResolverForContentUriOnly,
+          )
+      )
     } else {
       throw Throwable("Unreachable exception. Just to make linter happy for the lazy block.")
     }
@@ -432,7 +463,7 @@ class ProducerSequenceFactory(
    * -> (webp transcode) -> data fetch.
    */
   val dataFetchSequence: Producer<CloseableReference<CloseableImage>> by lazy {
-    var inputProducer: Producer<EncodedImage?> = producerFactory.newDataFetchProducer()
+    var inputProducer: Producer<EncodedImage> = producerFactory.newDataFetchProducer()
     inputProducer = ProducerFactory.newAddImageTransformMetaDataProducer(inputProducer)
     inputProducer =
         producerFactory.newResizeAndRotateProducer(inputProducer, true, imageTranscoderFactory)
@@ -446,11 +477,14 @@ class ProducerSequenceFactory(
    * @return the new sequence
    */
   private fun newBitmapCacheGetToLocalTransformSequence(
-      inputProducer: Producer<EncodedImage>
+      inputProducer: Producer<EncodedImage>,
   ): Producer<CloseableReference<CloseableImage>> {
     val defaultThumbnailProducers: Array<ThumbnailProducer<EncodedImage>> =
         arrayOf(producerFactory.newLocalExifThumbnailProducer())
-    return newBitmapCacheGetToLocalTransformSequence(inputProducer, defaultThumbnailProducers)
+    return newBitmapCacheGetToLocalTransformSequence(
+        inputProducer,
+        defaultThumbnailProducers,
+    )
   }
 
   /**
@@ -463,7 +497,7 @@ class ProducerSequenceFactory(
    */
   private fun newBitmapCacheGetToLocalTransformSequence(
       inputProducer: Producer<EncodedImage>,
-      thumbnailProducers: Array<ThumbnailProducer<EncodedImage>>
+      thumbnailProducers: Array<ThumbnailProducer<EncodedImage>>,
   ): Producer<CloseableReference<CloseableImage>> {
     var ip = inputProducer
     ip = newEncodedCacheMultiplexToTranscodeSequence(ip)
@@ -493,7 +527,7 @@ class ProducerSequenceFactory(
    * @return encoded cache multiplex to webp transcode sequence
    */
   private fun newEncodedCacheMultiplexToTranscodeSequence(
-      inputProducer: Producer<EncodedImage>
+      inputProducer: Producer<EncodedImage>,
   ): Producer<EncodedImage> {
     var ip = inputProducer
     if (diskCacheEnabled) {
@@ -534,7 +568,9 @@ class ProducerSequenceFactory(
         producerFactory.newBitmapMemoryCacheKeyMultiplexProducer(bitmapMemoryCacheProducer)
     val threadHandoffProducer =
         producerFactory.newBackgroundThreadHandoffProducer(
-            bitmapKeyMultiplexProducer, threadHandoffProducerQueue)
+            bitmapKeyMultiplexProducer,
+            threadHandoffProducerQueue,
+        )
     if (isEncodedMemoryCacheProbingEnabled || isDiskCacheProbingEnabled) {
       val bitmapMemoryCacheGetProducer =
           producerFactory.newBitmapMemoryCacheGetProducer(threadHandoffProducer)
@@ -554,7 +590,7 @@ class ProducerSequenceFactory(
    */
   private fun newLocalTransformationsSequence(
       inputProducer: Producer<EncodedImage>,
-      thumbnailProducers: Array<ThumbnailProducer<EncodedImage>>
+      thumbnailProducers: Array<ThumbnailProducer<EncodedImage>>,
   ): Producer<EncodedImage> {
     var localImageProducer: Producer<EncodedImage> =
         ProducerFactory.newAddImageTransformMetaDataProducer(inputProducer)
@@ -562,9 +598,13 @@ class ProducerSequenceFactory(
         producerFactory.newResizeAndRotateProducer(localImageProducer, true, imageTranscoderFactory)
     val localImageThrottlingProducer =
         producerFactory.newThrottlingProducer(
-            localImageThrottlingMaxSimultaneousRequests, localImageProducer)
+            localImageThrottlingMaxSimultaneousRequests,
+            localImageProducer,
+        )
     return ProducerFactory.newBranchOnSeparateImagesProducer(
-        newLocalThumbnailProducer(thumbnailProducers), localImageThrottlingProducer)
+        newLocalThumbnailProducer(thumbnailProducers),
+        localImageThrottlingProducer,
+    )
   }
 
   private fun newLocalThumbnailProducer(
@@ -572,10 +612,13 @@ class ProducerSequenceFactory(
   ): Producer<EncodedImage> {
     val thumbnailBranchProducer = producerFactory.newThumbnailBranchProducer(thumbnailProducers)
     return producerFactory.newResizeAndRotateProducer(
-        thumbnailBranchProducer, true, imageTranscoderFactory)
+        thumbnailBranchProducer,
+        true,
+        imageTranscoderFactory,
+    )
   }
 
-  /** post-processor producer -> copy producer -> inputProducer */
+  /** post-processor producer -> inputProducer */
   @Synchronized
   private fun getPostprocessorSequence(
       inputProducer: Producer<CloseableReference<CloseableImage>>
@@ -626,7 +669,8 @@ class ProducerSequenceFactory(
     private fun validateEncodedImageRequest(imageRequest: ImageRequest) {
       Preconditions.checkArgument(
           imageRequest.lowestPermittedRequestLevel.value <=
-              ImageRequest.RequestLevel.ENCODED_MEMORY_CACHE.value)
+              ImageRequest.RequestLevel.ENCODED_MEMORY_CACHE.value
+      )
     }
 
     private fun getShortenedUriString(uri: Uri): String {

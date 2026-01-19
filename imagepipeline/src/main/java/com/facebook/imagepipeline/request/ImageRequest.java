@@ -66,6 +66,13 @@ public class ImageRequest {
   /** If set - the client will receive intermediate results */
   private final boolean mProgressiveRenderingEnabled;
 
+  /**
+   * If set - the client will not return the partial images stored in caches that store encoded
+   * images and will attempt to make a network request where feasible to fetch the rest of the
+   * image.
+   */
+  private final boolean mSkipEncodedPartialImagesInCachesNotInRequestRange;
+
   /** If set the client will receive thumbnail previews for local images, before the whole image */
   private final boolean mLocalThumbnailPreviewsEnabled;
 
@@ -127,6 +134,9 @@ public class ImageRequest {
 
   private final int mDelayMs;
 
+  /** Whether to extract first frame thumbnail from video. */
+  private final Boolean mIsFirstFrameThumbnailEnabled;
+
   public static @Nullable ImageRequest fromFile(@Nullable File file) {
     return (file == null) ? null : ImageRequest.fromUri(UriUtil.getUriForFile(file));
   }
@@ -145,6 +155,8 @@ public class ImageRequest {
     mSourceUriType = getSourceUriType(mSourceUri);
 
     mProgressiveRenderingEnabled = builder.isProgressiveRenderingEnabled();
+    mSkipEncodedPartialImagesInCachesNotInRequestRange =
+        builder.getSkipEncodedPartialImagesInCachesNotInRequestRange();
     mLocalThumbnailPreviewsEnabled = builder.isLocalThumbnailPreviewsEnabled();
     mLoadThumbnailOnly = builder.getLoadThumbnailOnly();
 
@@ -183,6 +195,8 @@ public class ImageRequest {
     mDelayMs = builder.getDelayMs();
 
     mDiskCacheId = builder.getDiskCacheId();
+
+    mIsFirstFrameThumbnailEnabled = builder.getIsFirstFrameThumbnailEnabled();
   }
 
   public CacheChoice getCacheChoice() {
@@ -234,12 +248,20 @@ public class ImageRequest {
     return mProgressiveRenderingEnabled;
   }
 
+  public boolean getSkipEncodedPartialImagesInCachesNotInRequestRange() {
+    return mSkipEncodedPartialImagesInCachesNotInRequestRange;
+  }
+
   public boolean getLocalThumbnailPreviewsEnabled() {
     return mLocalThumbnailPreviewsEnabled;
   }
 
   public boolean getLoadThumbnailOnlyForAndroidSdkAboveQ() {
     return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mLoadThumbnailOnly;
+  }
+
+  public ImageRequest newImageRequestFromImageRequestBuilder(ImageRequestBuilder builder) {
+    return builder.build();
   }
 
   public Priority getPriority() {
@@ -303,6 +325,10 @@ public class ImageRequest {
     return mDiskCacheId;
   }
 
+  public Boolean isFirstFrameThumbnailEnabled() {
+    return mIsFirstFrameThumbnailEnabled;
+  }
+
   @Override
   public boolean equals(@Nullable Object o) {
     if (!(o instanceof ImageRequest)) {
@@ -333,7 +359,8 @@ public class ImageRequest {
         || !Objects.equal(mResizingAllowedOverride, request.mResizingAllowedOverride)
         || !Objects.equal(mDownsampleOverride, request.mDownsampleOverride)
         || !Objects.equal(mRotationOptions, request.mRotationOptions)
-        || mLoadThumbnailOnly != request.mLoadThumbnailOnly) {
+        || mLoadThumbnailOnly != request.mLoadThumbnailOnly
+        || mIsFirstFrameThumbnailEnabled != request.mIsFirstFrameThumbnailEnabled) {
       return false;
     }
     final CacheKey thisPostprocessorKey =
@@ -372,6 +399,7 @@ public class ImageRequest {
       result = HashCode.extend(result, mDownsampleOverride);
       result = HashCode.extend(result, mDelayMs);
       result = HashCode.extend(result, mLoadThumbnailOnly);
+      result = HashCode.extend(result, mIsFirstFrameThumbnailEnabled);
       // ^ I *think* this is safe despite autoboxing...?
       if (cacheHashcode) {
         mHashcode = result;
@@ -402,6 +430,7 @@ public class ImageRequest {
         .add("isMemoryCacheEnabled", mIsMemoryCacheEnabled)
         .add("decodePrefetches", mDecodePrefetches)
         .add("delayMs", mDelayMs)
+        .add("isFirstFrameThumbnailEnabled", mIsFirstFrameThumbnailEnabled)
         .toString();
   }
 

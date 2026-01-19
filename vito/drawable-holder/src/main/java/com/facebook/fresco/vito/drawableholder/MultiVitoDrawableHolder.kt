@@ -14,16 +14,19 @@ import com.facebook.fresco.vito.listener.ImageListener
 import com.facebook.fresco.vito.options.ImageOptions
 import com.facebook.fresco.vito.provider.FrescoVitoProvider
 import com.facebook.fresco.vito.source.ImageSource
+import com.facebook.fresco.vito.source.ImageSourceProvider
 
 class MultiVitoDrawableHolder {
 
   class VitoDrawableHolder(
-      var drawable: FrescoDrawableInterface,
+      val drawable: FrescoDrawableInterface,
       var imageOptionsBuilder: ImageOptions.Builder,
       var imageSource: ImageSource,
-      var resources: Resources,
+      val resources: Resources,
       var callerContext: Any?,
       var imageListener: ImageListener? = null,
+      var loggingExtras: Map<String, Any> = emptyMap(),
+      var logWithHighSampleRate: Boolean = false,
   )
 
   private val holders: ArrayList<VitoDrawableHolder> = ArrayList()
@@ -108,13 +111,27 @@ class MultiVitoDrawableHolder {
     holders.clear()
   }
 
+  fun reset() {
+    if (isAttached) {
+      for (i in holders.indices) {
+        detachHolder(holders[i])
+        holders[i].imageSource = ImageSourceProvider.emptySource()
+      }
+    }
+  }
+
   companion object {
     @JvmStatic
     fun attachHolder(holder: VitoDrawableHolder) {
       val vitoImageRequest =
           FrescoVitoProvider.getImagePipeline()
               .createImageRequest(
-                  holder.resources, holder.imageSource, holder.imageOptionsBuilder.build())
+                  holder.resources,
+                  holder.imageSource,
+                  holder.imageOptionsBuilder.build(),
+                  logWithHighSamplingRate = holder.logWithHighSampleRate,
+              )
+      vitoImageRequest.putExtras(holder.loggingExtras)
       FrescoVitoProvider.getController()
           .fetch(
               drawable = holder.drawable,
@@ -129,7 +146,13 @@ class MultiVitoDrawableHolder {
 
     @JvmStatic
     fun detachHolder(holder: VitoDrawableHolder) {
-      FrescoVitoProvider.getController().release(holder.drawable)
+      FrescoVitoProvider.getController().releaseNextFrame(holder.drawable)
+    }
+
+    @JvmStatic
+    fun draw(holder: VitoDrawableHolder, canvas: android.graphics.Canvas) {
+      val drawable = holder.drawable as Drawable
+      drawable.draw(canvas)
     }
   }
 }

@@ -10,6 +10,7 @@ package com.facebook.imagepipeline.decoder;
 import com.facebook.common.internal.Preconditions;
 import com.facebook.imagepipeline.image.ImmutableQualityInfo;
 import com.facebook.imagepipeline.image.QualityInfo;
+import com.facebook.imagepipeline.request.ImageRequest;
 import com.facebook.infer.annotation.Nullsafe;
 import java.util.Collections;
 import java.util.List;
@@ -23,17 +24,19 @@ import java.util.List;
 public class SimpleProgressiveJpegConfig implements ProgressiveJpegConfig {
   public interface DynamicValueConfig {
 
-    List<Integer> getScansToDecode();
+    List<Integer> getScansToDecode(ImageRequest imageRequest);
 
-    int getGoodEnoughScanNumber();
+    int getGoodEnoughScanNumber(ImageRequest imageRequest);
   }
 
   private static class DefaultDynamicValueConfig implements DynamicValueConfig {
-    public List<Integer> getScansToDecode() {
+    @Override
+    public List<Integer> getScansToDecode(ImageRequest imageRequest) {
       return Collections.EMPTY_LIST;
     }
 
-    public int getGoodEnoughScanNumber() {
+    @Override
+    public int getGoodEnoughScanNumber(ImageRequest imageRequest) {
       return 0;
     }
   }
@@ -49,13 +52,13 @@ public class SimpleProgressiveJpegConfig implements ProgressiveJpegConfig {
   }
 
   @Override
-  public boolean decodeProgressively() {
+  public boolean decodeProgressively(ImageRequest imageRequest) {
     return true;
   }
 
   @Override
-  public int getNextScanNumberToDecode(int scanNumber) {
-    final List<Integer> scansToDecode = mDynamicValueConfig.getScansToDecode();
+  public int getNextScanNumberToDecode(ImageRequest imageRequest, int scanNumber) {
+    final List<Integer> scansToDecode = mDynamicValueConfig.getScansToDecode(imageRequest);
     if (scansToDecode == null || scansToDecode.isEmpty()) {
       return scanNumber + 1;
     }
@@ -69,10 +72,11 @@ public class SimpleProgressiveJpegConfig implements ProgressiveJpegConfig {
   }
 
   @Override
-  public QualityInfo getQualityInfo(int scanNumber) {
+  public QualityInfo getQualityInfo(ImageRequest imageRequest, int scanNumber) {
     return ImmutableQualityInfo.of(
         scanNumber,
-        /* isOfGoodEnoughQuality */ scanNumber >= mDynamicValueConfig.getGoodEnoughScanNumber(),
+        /* isOfGoodEnoughQuality */ scanNumber
+            >= mDynamicValueConfig.getGoodEnoughScanNumber(imageRequest),
         /* isOfFullQuality */ false);
   }
 }

@@ -11,6 +11,7 @@ import com.facebook.cache.common.CacheKey;
 import com.facebook.common.internal.ImmutableMap;
 import com.facebook.common.memory.PooledByteBuffer;
 import com.facebook.common.references.CloseableReference;
+import com.facebook.fresco.middleware.HasExtraData;
 import com.facebook.imageformat.ImageFormat;
 import com.facebook.imagepipeline.cache.CacheKeyFactory;
 import com.facebook.imagepipeline.cache.MemoryCache;
@@ -60,8 +61,11 @@ public class EncodedMemoryCacheProducer implements Producer<EncodedImage> {
       CloseableReference<PooledByteBuffer> cachedReference =
           isEncodedCacheEnabledForRead ? mMemoryCache.get(cacheKey) : null;
       try {
-        if (cachedReference != null) {
-          EncodedImage cachedEncodedImage = new EncodedImage(cachedReference);
+        EncodedImage cachedEncodedImage =
+            cachedReference == null ? null : new EncodedImage(cachedReference);
+        if (cachedEncodedImage != null
+            && !DiskCacheReadProducer.shouldSkipPartialEncodedImage(
+                cachedEncodedImage, imageRequest)) {
           try {
             listener.onProducerFinishWithSuccess(
                 producerContext,
@@ -71,6 +75,10 @@ public class EncodedMemoryCacheProducer implements Producer<EncodedImage> {
                     : null);
             listener.onUltimateProducerReached(producerContext, PRODUCER_NAME, true);
             producerContext.putOriginExtra("memory_encoded");
+            producerContext.putExtra(HasExtraData.KEY_ENCODED_SIZE, cachedEncodedImage.getSize());
+            producerContext.putExtra(HasExtraData.KEY_ENCODED_WIDTH, cachedEncodedImage.getWidth());
+            producerContext.putExtra(
+                HasExtraData.KEY_ENCODED_HEIGHT, cachedEncodedImage.getHeight());
             consumer.onProgressUpdate(1f);
             consumer.onNewResult(cachedEncodedImage, Consumer.IS_LAST);
             return;

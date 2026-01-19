@@ -7,11 +7,11 @@
 
 package com.facebook.fresco.vito.core.impl
 
-import android.graphics.Bitmap
 import android.os.Build
 import com.facebook.common.logging.FLog
 import com.facebook.fresco.vito.core.impl.ImagePipelineUtilsImpl.CircularBitmapRounding
 import com.facebook.fresco.vito.core.impl.ImagePipelineUtilsImpl.ImageDecodeOptionsProvider
+import com.facebook.fresco.vito.options.BitmapConfig
 import com.facebook.fresco.vito.options.DecodedImageOptions
 import com.facebook.fresco.vito.options.RoundingOptions
 import com.facebook.imagepipeline.common.ImageDecodeOptions
@@ -23,11 +23,14 @@ class DefaultImageDecodeOptionsProviderImpl(
 
   override fun create(
       imageRequestBuilder: ImageRequestBuilder,
-      imageOptions: DecodedImageOptions
+      imageOptions: DecodedImageOptions,
   ): ImageDecodeOptions? =
       maybeCreateFromConfigAndCustomDecoder(imageOptions)
           ?: maybeSetupPipelineRounding(
-              imageOptions.roundingOptions, imageOptions.bitmapConfig, circularBitmapRounding)
+              imageOptions.roundingOptions,
+              imageOptions.bitmapConfig,
+              circularBitmapRounding,
+          )
 
   companion object {
     private const val TAG = "DefaultImageOptionsProvider"
@@ -38,19 +41,26 @@ class DefaultImageDecodeOptionsProviderImpl(
     ): ImageDecodeOptions? {
       val bitmapConfig = imageOptions.bitmapConfig
       val imageDecodeOptions = imageOptions.imageDecodeOptions
+      val animatedOptions = imageOptions.animatedOptions
+      // Check if animation should be disabled
+      val forceStaticImage = animatedOptions?.isAnimationDisabled() == true
       if (bitmapConfig != null) {
         if (imageOptions.roundingOptions != null || imageOptions.postprocessor != null) {
           FLog.wtf(TAG, "Trying to use bitmap config incompatible with rounding.")
         } else {
           return ImageDecodeOptions.newBuilder()
-              .setBitmapConfig(bitmapConfig)
+              .setBitmapConfig(bitmapConfig.toAndroidBitmapConfig())
               .setCustomImageDecoder(imageOptions.imageDecodeOptions?.customImageDecoder)
+              .setForceStaticImage(forceStaticImage)
               .build()
         }
       } else if (imageDecodeOptions?.customImageDecoder != null) {
         return ImageDecodeOptions.newBuilder()
             .setCustomImageDecoder(imageDecodeOptions.customImageDecoder)
+            .setForceStaticImage(forceStaticImage)
             .build()
+      } else if (forceStaticImage) {
+        return ImageDecodeOptions.newBuilder().setForceStaticImage(true).build()
       }
 
       return null
@@ -59,22 +69,22 @@ class DefaultImageDecodeOptionsProviderImpl(
     @JvmStatic
     fun maybeSetupPipelineRounding(
         roundingOptions: RoundingOptions?,
-        bitmapConfig: Bitmap.Config?,
-        circularBitmapRounding: CircularBitmapRounding?
+        bitmapConfig: BitmapConfig?,
+        circularBitmapRounding: CircularBitmapRounding?,
     ): ImageDecodeOptions? =
-        if (roundingOptions == null ||
-            roundingOptions.isForceRoundAtDecode ||
-            !roundingOptions.isCircular ||
-            circularBitmapRounding == null ||
-            pipelineRoundingUnsupportedForBitmapConfig(bitmapConfig)) {
+        if (
+            roundingOptions == null ||
+                roundingOptions.isForceRoundAtDecode ||
+                !roundingOptions.isCircular ||
+                circularBitmapRounding == null ||
+                pipelineRoundingUnsupportedForBitmapConfig(bitmapConfig)
+        ) {
           null
         } else {
           circularBitmapRounding.getDecodeOptions(roundingOptions.isAntiAliased)
         }
 
-    private fun pipelineRoundingUnsupportedForBitmapConfig(bitmapConfig: Bitmap.Config?): Boolean =
-        bitmapConfig == Bitmap.Config.RGB_565 ||
-            (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-                bitmapConfig == Bitmap.Config.HARDWARE)
+    private fun pipelineRoundingUnsupportedForBitmapConfig(bitmapConfig: BitmapConfig?): Boolean =
+        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && bitmapConfig == BitmapConfig.HARDWARE)
   }
 }

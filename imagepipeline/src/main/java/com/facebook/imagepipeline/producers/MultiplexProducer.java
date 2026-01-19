@@ -13,6 +13,7 @@ import com.facebook.common.internal.Preconditions;
 import com.facebook.common.internal.Sets;
 import com.facebook.common.util.TriState;
 import com.facebook.imagepipeline.common.Priority;
+import com.facebook.imagepipeline.core.ImagePipelineConfigInterface;
 import com.facebook.imagepipeline.systrace.FrescoSystrace;
 import com.facebook.infer.annotation.Nullsafe;
 import java.io.Closeable;
@@ -63,22 +64,28 @@ public abstract class MultiplexProducer<K, T extends Closeable> implements Produ
 
   private final String mProducerName;
   private final String mDedupedRequestsCountKey;
+  private final ImagePipelineConfigInterface mConfig;
 
   protected MultiplexProducer(
-      Producer<T> inputProducer, String producerName, String dedupedRequestsCountKey) {
-    this(inputProducer, producerName, dedupedRequestsCountKey, false);
+      Producer<T> inputProducer,
+      String producerName,
+      String dedupedRequestsCountKey,
+      ImagePipelineConfigInterface config) {
+    this(inputProducer, producerName, dedupedRequestsCountKey, false, config);
   }
 
   protected MultiplexProducer(
       Producer<T> inputProducer,
       String producerName,
       String dedupedRequestsCountKey,
-      boolean keepCancelledFetchAsLowPriority) {
+      boolean keepCancelledFetchAsLowPriority,
+      ImagePipelineConfigInterface config) {
     mInputProducer = inputProducer;
     mMultiplexers = new HashMap<>();
     mKeepCancelledFetchAsLowPriority = keepCancelledFetchAsLowPriority;
     mProducerName = producerName;
     mDedupedRequestsCountKey = dedupedRequestsCountKey;
+    mConfig = config;
   }
 
   @Override
@@ -532,6 +539,15 @@ public abstract class MultiplexProducer<K, T extends Closeable> implements Produ
     }
 
     public void onProgressUpdate(ForwardingConsumer forwardingConsumer, float progress) {
+      if (mConfig.getExperiments().getIntermediateProgressUpdatesDisabled()) {
+        return;
+      }
+      if (mConfig.getExperiments().getIntermediateProgressUpdatesForPrefetchDisabled()) {
+        BaseProducerContext context = mMultiplexProducerContext;
+        if (context != null && context.isPrefetch()) {
+          return;
+        }
+      }
       Iterator<Pair<Consumer<T>, ProducerContext>> iterator;
       synchronized (Multiplexer.this) {
         // check for late callbacks

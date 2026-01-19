@@ -7,7 +7,7 @@
 
 package com.facebook.imagepipeline.producers;
 
-import static org.junit.Assert.assertSame;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
@@ -17,7 +17,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.facebook.cache.common.CacheKey;
@@ -161,9 +160,8 @@ public class DiskCacheWriteProducerTest {
     ArgumentCaptor<EncodedImage> argumentCaptor = ArgumentCaptor.forClass(EncodedImage.class);
     verify(mDefaultBufferedDiskCache).put(eq(mCacheKey), argumentCaptor.capture());
     EncodedImage encodedImage = argumentCaptor.getValue();
-    assertSame(
-        encodedImage.getByteBufferRef().getUnderlyingReferenceTestOnly(),
-        mFinalImageReference.getUnderlyingReferenceTestOnly());
+    assertThat(encodedImage.getByteBufferRef().getUnderlyingReferenceTestOnly())
+        .isSameAs(mFinalImageReference.getUnderlyingReferenceTestOnly());
     verify(mConsumer).onNewResult(mIntermediateEncodedImage, Consumer.NO_FLAGS);
     verify(mConsumer).onNewResult(mFinalEncodedImage, Consumer.IS_LAST);
     verify(mProducerListener, times(2)).onProducerStart(mProducerContext, PRODUCER_NAME);
@@ -249,7 +247,7 @@ public class DiskCacheWriteProducerTest {
         .onNewResult(
             mFinalEncodedImageFormatUnknown, Consumer.IS_LAST | Consumer.IS_PARTIAL_RESULT);
 
-    verifyZeroInteractions(mDefaultBufferedDiskCache, mSmallImageBufferedDiskCache);
+    verifyNoMoreInteractions(mDefaultBufferedDiskCache, mSmallImageBufferedDiskCache);
   }
 
   @Test
@@ -259,7 +257,7 @@ public class DiskCacheWriteProducerTest {
     verify(mConsumer).onNewResult(null, Consumer.IS_LAST);
     verify(mProducerListener).onProducerStart(mProducerContext, PRODUCER_NAME);
     verify(mProducerListener).onProducerFinishWithSuccess(mProducerContext, PRODUCER_NAME, null);
-    verifyZeroInteractions(mDefaultBufferedDiskCache, mSmallImageBufferedDiskCache);
+    verifyNoMoreInteractions(mDefaultBufferedDiskCache, mSmallImageBufferedDiskCache);
   }
 
   @Test
@@ -267,7 +265,7 @@ public class DiskCacheWriteProducerTest {
     setupInputProducerFailure();
     mDiskCacheWriteProducer.produceResults(mConsumer, mProducerContext);
     verify(mConsumer).onFailure(mException);
-    verifyZeroInteractions(
+    verifyNoMoreInteractions(
         mProducerListener, mDefaultBufferedDiskCache, mSmallImageBufferedDiskCache);
   }
 
@@ -306,7 +304,7 @@ public class DiskCacheWriteProducerTest {
     when(mProducerListener.requiresExtraMap(mProducerContext, PRODUCER_NAME)).thenReturn(false);
     mDiskCacheWriteProducer.produceResults(mConsumer, mLowestLevelProducerContext);
     verify(mConsumer).onNewResult(null, Consumer.IS_LAST);
-    verifyZeroInteractions(
+    verifyNoMoreInteractions(
         mInputProducer, mDefaultBufferedDiskCache, mSmallImageBufferedDiskCache, mProducerListener);
   }
 

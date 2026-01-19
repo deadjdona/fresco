@@ -23,7 +23,7 @@ class FrameLoaderFactory(
   fun createBufferLoader(
       cacheKey: String,
       bitmapFrameRenderer: BitmapFrameRenderer,
-      animationInformation: AnimationInformation
+      animationInformation: AnimationInformation,
   ): FrameLoader {
     synchronized(UNUSED_FRAME_LOADERS) {
       val unusedFrameLoader = UNUSED_FRAME_LOADERS[cacheKey]
@@ -38,7 +38,8 @@ class FrameLoaderFactory(
         bitmapFrameRenderer,
         FpsCompressorInfo(maxFpsRender),
         animationInformation,
-        bufferLengthMilliseconds)
+        bufferLengthMilliseconds,
+    )
   }
 
   companion object {
@@ -52,9 +53,9 @@ class FrameLoaderFactory(
       synchronized(UNUSED_FRAME_LOADERS) {
         val oldItems = UNUSED_FRAME_LOADERS.filter { it.value.insertedTime < until }
 
-        oldItems.forEach {
-          it.value.frameLoader.clear()
-          UNUSED_FRAME_LOADERS.remove(it.key)
+        oldItems.forEach { entry ->
+          entry.value.frameLoader.clear()
+          UNUSED_FRAME_LOADERS.remove(entry.key)
         }
       }
     }

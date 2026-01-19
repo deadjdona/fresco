@@ -10,6 +10,7 @@ package com.facebook.fresco.urimod
 import android.net.Uri
 import com.facebook.common.callercontext.ContextChain
 import com.facebook.drawee.drawable.ScalingUtils.ScaleType
+import com.facebook.drawee.drawable.Viewport
 import com.facebook.fresco.vito.source.UriImageSource
 
 interface UriModifierInterface {
@@ -22,14 +23,17 @@ interface UriModifierInterface {
       contextChain: ContextChain? = null,
   ): ModificationResult
 
-  fun calculateBestUri(uri: Uri?, viewport: Dimensions?, scaleType: ScaleType?): Uri? = null
+  fun calculateBestUri(uri: Uri?, viewport: Viewport): Uri? = null
 
   fun modifyPrefetchUri(uri: Uri, callerContext: Any?): Uri?
 
-  fun modifyNetworkUriAdaptively(
+  /**
+   * Modifies the network uri adaptively based on current network or other conditions. No need to
+   * provide viewport or scale type since those are extracted from the uri itself.
+   */
+  fun modifyNetworkUriForNetworkFetcher(
       uri: Uri,
-      viewport: Dimensions?,
-      scaleType: ScaleType?,
+      viewport: Viewport?,
       callerContext: Any?,
       contextChain: ContextChain? = null,
   ): ModificationResult = ModificationResult.Disabled("Default")
@@ -47,11 +51,22 @@ interface UriModifierInterface {
     }
 
     sealed class Modified(val newUri: Uri, comment: String) : ModificationResult(comment) {
+
+      var isVariation: Boolean = false
+
       class ModifiedToAllowlistedSize(newUrl: Uri, override val bestAllowlistedSize: Int?) :
           Modified(newUrl, "ModifiedToAllowlistedSize")
 
       class ModifiedToMaxDimens(newUrl: Uri, override val bestAllowlistedSize: Int?) :
           Modified(newUrl, "ModifiedToMaxDimens")
+
+      class ModifiedScanEnd(newUrl: Uri) : Modified(newUrl, "ModifiedScanEnd") {
+        override val bestAllowlistedSize: Int? = null
+      }
+
+      class ModifiedQuality(newUrl: Uri) : Modified(newUrl, "ModifiedQuality") {
+        override val bestAllowlistedSize: Int? = null
+      }
     }
 
     data class FallbackToOriginalUrl(override val bestAllowlistedSize: Int?) :

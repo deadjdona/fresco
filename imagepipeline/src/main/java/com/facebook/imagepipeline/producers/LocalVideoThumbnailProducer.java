@@ -14,7 +14,6 @@ import android.graphics.Bitmap;
 import android.media.MediaMetadataRetriever;
 import android.media.ThumbnailUtils;
 import android.net.Uri;
-import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import androidx.annotation.VisibleForTesting;
@@ -89,14 +88,17 @@ public class LocalVideoThumbnailProducer implements Producer<CloseableReference<
               path = null;
             }
 
-            if (path != null) {
+            if (path != null && !imageRequest.isFirstFrameThumbnailEnabled()) {
               thumbnailBitmap =
                   ThumbnailUtils.createVideoThumbnail(path, calculateKind(imageRequest));
             }
 
             if (thumbnailBitmap == null) {
               thumbnailBitmap =
-                  createThumbnailFromContentProvider(mContentResolver, imageRequest.getSourceUri());
+                  createThumbnailFromContentProvider(
+                      mContentResolver,
+                      imageRequest.getSourceUri(),
+                      imageRequest.isFirstFrameThumbnailEnabled());
             }
 
             if (thumbnailBitmap == null) {
@@ -150,28 +152,24 @@ public class LocalVideoThumbnailProducer implements Producer<CloseableReference<
 
   @Nullable
   private static Bitmap createThumbnailFromContentProvider(
-      ContentResolver contentResolver, Uri uri) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.GINGERBREAD_MR1) {
-      MediaMetadataRetriever mediaMetadataRetriever = null;
-      try {
-        ParcelFileDescriptor videoFile = contentResolver.openFileDescriptor(uri, "r");
-        Preconditions.checkNotNull(videoFile);
-        mediaMetadataRetriever = new MediaMetadataRetriever();
-        mediaMetadataRetriever.setDataSource(videoFile.getFileDescriptor());
-        return mediaMetadataRetriever.getFrameAtTime(-1);
-      } catch (FileNotFoundException e) {
-        return null;
-      } finally {
-        if (mediaMetadataRetriever != null) {
-          try {
-            mediaMetadataRetriever.release();
-          } catch (IOException ex) {
-            // Nothing to do.
-          }
+      ContentResolver contentResolver, Uri uri, Boolean isFirstFrameThumbnailEnabled) {
+    MediaMetadataRetriever mediaMetadataRetriever = null;
+    try {
+      ParcelFileDescriptor videoFile = contentResolver.openFileDescriptor(uri, "r");
+      Preconditions.checkNotNull(videoFile);
+      mediaMetadataRetriever = new MediaMetadataRetriever();
+      mediaMetadataRetriever.setDataSource(videoFile.getFileDescriptor());
+      return mediaMetadataRetriever.getFrameAtTime(isFirstFrameThumbnailEnabled ? 0 : -1);
+    } catch (FileNotFoundException e) {
+      return null;
+    } finally {
+      if (mediaMetadataRetriever != null) {
+        try {
+          mediaMetadataRetriever.release();
+        } catch (IOException ex) {
+          // Nothing to do.
         }
       }
-    } else {
-      return null;
     }
   }
 }

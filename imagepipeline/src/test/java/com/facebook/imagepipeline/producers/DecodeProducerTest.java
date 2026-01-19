@@ -7,7 +7,7 @@
 
 package com.facebook.imagepipeline.producers;
 
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
@@ -104,11 +104,13 @@ public class DecodeProducerTest {
     mProgressiveJpegConfig =
         new SimpleProgressiveJpegConfig(
             new SimpleProgressiveJpegConfig.DynamicValueConfig() {
-              public List<Integer> getScansToDecode() {
+              @Override
+              public List<Integer> getScansToDecode(ImageRequest imageRequest) {
                 return Arrays.asList(PREVIEW_SCAN, GOOD_ENOUGH_SCAN);
               }
 
-              public int getGoodEnoughScanNumber() {
+              @Override
+              public int getGoodEnoughScanNumber(ImageRequest imageRequest) {
                 return GOOD_ENOUGH_SCAN;
               }
             });
@@ -142,7 +144,8 @@ public class DecodeProducerTest {
             MAX_BITMAP_SIZE,
             new CloseableReferenceFactory(new NoOpCloseableReferenceLeakTracker()),
             null,
-            Suppliers.BOOLEAN_FALSE);
+            Suppliers.BOOLEAN_FALSE,
+            null);
 
     PooledByteBuffer pooledByteBuffer = mockPooledByteBuffer(IMAGE_SIZE);
     mByteBufferRef = CloseableReference.of(pooledByteBuffer);
@@ -180,7 +183,7 @@ public class DecodeProducerTest {
 
     verify(mJobScheduler).updateJob(mEncodedImage, Consumer.IS_LAST);
     verify(mJobScheduler).scheduleJob();
-    verifyZeroInteractions(mProgressiveJpegParser);
+    verifyNoMoreInteractions(mProgressiveJpegParser);
   }
 
   @Test
@@ -193,7 +196,7 @@ public class DecodeProducerTest {
 
     verify(mJobScheduler).updateJob(mEncodedImage, Consumer.IS_LAST);
     verify(mJobScheduler).scheduleJob();
-    verifyZeroInteractions(mProgressiveJpegParser);
+    verifyNoMoreInteractions(mProgressiveJpegParser);
   }
 
   @Test
@@ -208,7 +211,7 @@ public class DecodeProducerTest {
     InOrder inOrder = inOrder(mJobScheduler);
     inOrder.verify(mJobScheduler).updateJob(mEncodedImage, Consumer.NO_FLAGS);
     inOrder.verify(mJobScheduler).scheduleJob();
-    verifyZeroInteractions(mProgressiveJpegParser);
+    verifyNoMoreInteractions(mProgressiveJpegParser);
   }
 
   @Test
@@ -254,9 +257,8 @@ public class DecodeProducerTest {
     inOrder.verify(mJobScheduler).updateJob(mEncodedImage, Consumer.NO_FLAGS);
     inOrder.verify(mProgressiveJpegParser).parseMoreData(argumentCaptor.capture());
     inOrder.verify(mJobScheduler).scheduleJob();
-    assertSame(
-        ((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly(),
-        mByteBufferRef.getUnderlyingReferenceTestOnly());
+    assertThat(((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly())
+        .isSameAs(mByteBufferRef.getUnderlyingReferenceTestOnly());
 
     // no data parsed; ignore
     PooledByteBuffer pooledByteBuffer2 = mockPooledByteBuffer(210);
@@ -269,9 +271,8 @@ public class DecodeProducerTest {
     inOrder.verify(mJobScheduler).updateJob(encodedImage2, Consumer.NO_FLAGS);
     inOrder.verify(mProgressiveJpegParser).parseMoreData(argumentCaptor.capture());
     inOrder.verify(mJobScheduler, never()).scheduleJob();
-    assertSame(
-        ((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly(),
-        ref2.getUnderlyingReferenceTestOnly());
+    assertThat(((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly())
+        .isSameAs(ref2.getUnderlyingReferenceTestOnly());
 
     // same scan; ignore
     PooledByteBuffer pooledByteBuffer3 = mockPooledByteBuffer(220);
@@ -284,9 +285,8 @@ public class DecodeProducerTest {
     inOrder.verify(mJobScheduler).updateJob(encodedImage3, Consumer.NO_FLAGS);
     inOrder.verify(mProgressiveJpegParser).parseMoreData(argumentCaptor.capture());
     inOrder.verify(mJobScheduler, never()).scheduleJob();
-    assertSame(
-        ((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly(),
-        ref3.getUnderlyingReferenceTestOnly());
+    assertThat(((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly())
+        .isSameAs(ref3.getUnderlyingReferenceTestOnly());
 
     // scan not for decode; ignore
     PooledByteBuffer pooledByteBuffer4 = mockPooledByteBuffer(300);
@@ -299,9 +299,8 @@ public class DecodeProducerTest {
     inOrder.verify(mJobScheduler).updateJob(encodedImage4, Consumer.NO_FLAGS);
     inOrder.verify(mProgressiveJpegParser).parseMoreData(argumentCaptor.capture());
     inOrder.verify(mJobScheduler, never()).scheduleJob();
-    assertSame(
-        ((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly(),
-        ref4.getUnderlyingReferenceTestOnly());
+    assertThat(((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly())
+        .isSameAs(ref4.getUnderlyingReferenceTestOnly());
 
     // good-enough scan; schedule
     PooledByteBuffer pooledByteBuffer5 = mockPooledByteBuffer(500);
@@ -314,9 +313,8 @@ public class DecodeProducerTest {
     inOrder.verify(mJobScheduler).updateJob(encodedImage5, Consumer.NO_FLAGS);
     inOrder.verify(mProgressiveJpegParser).parseMoreData(argumentCaptor.capture());
     inOrder.verify(mJobScheduler).scheduleJob();
-    assertSame(
-        ((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly(),
-        ref5.getUnderlyingReferenceTestOnly());
+    assertThat(((EncodedImage) argumentCaptor.getValue()).getUnderlyingReferenceTestOnly())
+        .isSameAs(ref5.getUnderlyingReferenceTestOnly());
   }
 
   @Test
@@ -433,7 +431,7 @@ public class DecodeProducerTest {
     jobRunnable.run(mEncodedImage, Consumer.IS_LAST);
 
     // The sample size was modified, which means Downsampling has been performed
-    assertNotEquals(mEncodedImage.getSampleSize(), EncodedImage.DEFAULT_SAMPLE_SIZE);
+    assertThat(mEncodedImage.getSampleSize()).isNotEqualTo(EncodedImage.DEFAULT_SAMPLE_SIZE);
   }
 
   @Test
@@ -449,7 +447,7 @@ public class DecodeProducerTest {
     jobRunnable.run(mEncodedImage, Consumer.IS_LAST);
 
     // The sample size was not modified, which means Downsampling has not been performed
-    assertEquals(mEncodedImage.getSampleSize(), EncodedImage.DEFAULT_SAMPLE_SIZE);
+    assertThat(mEncodedImage.getSampleSize()).isEqualTo(EncodedImage.DEFAULT_SAMPLE_SIZE);
   }
 
   @Test
@@ -465,7 +463,7 @@ public class DecodeProducerTest {
     jobRunnable.run(mEncodedImage, Consumer.IS_LAST);
 
     // The sample size was not modified, which means Downsampling has not been performed
-    assertEquals(mEncodedImage.getSampleSize(), EncodedImage.DEFAULT_SAMPLE_SIZE);
+    assertThat(mEncodedImage.getSampleSize()).isEqualTo(EncodedImage.DEFAULT_SAMPLE_SIZE);
   }
 
   @Test
@@ -482,7 +480,7 @@ public class DecodeProducerTest {
     jobRunnable.run(mEncodedImage, Consumer.IS_LAST);
 
     // The sample size was not modified, which means Downsampling has not been performed
-    assertEquals(mEncodedImage.getSampleSize(), EncodedImage.DEFAULT_SAMPLE_SIZE);
+    assertThat(mEncodedImage.getSampleSize()).isEqualTo(EncodedImage.DEFAULT_SAMPLE_SIZE);
   }
 
   private void setupImageRequest(String requestId, ImageRequest imageRequest) {

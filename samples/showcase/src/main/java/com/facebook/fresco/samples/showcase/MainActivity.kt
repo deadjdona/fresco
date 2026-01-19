@@ -44,7 +44,8 @@ class MainActivity : AppCompatActivity() {
             drawerLayout,
             toolbar,
             R.string.navigation_drawer_open,
-            R.string.navigation_drawer_close)
+            R.string.navigation_drawer_close,
+        )
     drawerLayout.addDrawerListener(toggle)
     toggle.syncState()
 
@@ -61,7 +62,8 @@ class MainActivity : AppCompatActivity() {
       navView.menu.performIdentifierAction(
           PreferenceManager.getDefaultSharedPreferences(this)
               .getInt(KEY_SELECTED_NAVDRAWER_ITEM_ID, ExampleDatabase.welcome.itemId),
-          0)
+          0,
+      )
     }
   }
 
@@ -69,13 +71,13 @@ class MainActivity : AppCompatActivity() {
     menu
         .add(Menu.NONE, item.itemId, Menu.NONE, item.title)
         .setCheckable(true)
-        .setOnMenuItemClickListener {
+        .setOnMenuItemClickListener { menuItem ->
           showFragment(item.createFragment(), item.title, item.backstackTag)
           drawerLayout.closeDrawer(GravityCompat.START)
-          navView.setCheckedItem(it)
+          navView.setCheckedItem(menuItem)
           PreferenceManager.getDefaultSharedPreferences(this)
               .edit()
-              .putInt(KEY_SELECTED_NAVDRAWER_ITEM_ID, it.itemId)
+              .putInt(KEY_SELECTED_NAVDRAWER_ITEM_ID, menuItem.itemId)
               .apply()
           true
         }
@@ -99,7 +101,9 @@ class MainActivity : AppCompatActivity() {
     // the support toolbar should probably do this by default
     val styles =
         obtainStyledAttributes(
-            R.style.AppTheme_Toolbar, intArrayOf(androidx.appcompat.R.attr.colorControlNormal))
+            R.style.AppTheme_Toolbar,
+            intArrayOf(androidx.appcompat.R.attr.colorControlNormal),
+        )
     try {
       val tintColor = styles.getColor(0, Color.BLACK)
       for (i in 0 until menu.size()) {
@@ -135,7 +139,7 @@ class MainActivity : AppCompatActivity() {
   override fun onRequestPermissionsResult(
       requestCode: Int,
       permissions: Array<out String>,
-      grantResults: IntArray
+      grantResults: IntArray,
   ) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     StoragePermissionHelper.onRequestPermissionsResult(this, requestCode, permissions, grantResults)

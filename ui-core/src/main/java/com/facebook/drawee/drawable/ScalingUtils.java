@@ -29,6 +29,8 @@ public class ScalingUtils {
    */
   public interface ScaleType {
 
+    ScaleType DISABLED = ScaleTypeDisabled.INSTANCE;
+
     /**
      * Scales width and height independently, so that the child matches the parent exactly. This may
      * change the aspect ratio of the child.
@@ -122,6 +124,8 @@ public class ScalingUtils {
         int childHeight,
         float focusX,
         float focusY);
+
+    String getDescription();
   }
 
   @Nullable
@@ -174,6 +178,11 @@ public class ScalingUtils {
         float focusY,
         float scaleX,
         float scaleY);
+
+    @Override
+    public String getDescription() {
+      return this.toString();
+    }
   }
 
   private static class ScaleTypeFitXY extends AbstractScaleType {
@@ -197,7 +206,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "fit_xy";
     }
   }
@@ -224,7 +233,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "fit_start";
     }
   }
@@ -251,7 +260,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "fit_bottom_start";
     }
   }
@@ -278,7 +287,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "fit_center";
     }
   }
@@ -305,7 +314,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "fit_end";
     }
   }
@@ -330,7 +339,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "center";
     }
   }
@@ -357,7 +366,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "center_inside";
     }
   }
@@ -391,7 +400,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "center_crop";
     }
   }
@@ -427,7 +436,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "focus_crop";
     }
   }
@@ -455,7 +464,7 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "fit_x";
     }
   }
@@ -483,8 +492,35 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return "fit_y";
+    }
+  }
+
+  private static class ScaleTypeDisabled implements ScaleType {
+
+    public static final ScaleType INSTANCE = new ScaleTypeDisabled();
+
+    @Override
+    public String toString() {
+      return "disabled";
+    }
+
+    @Override
+    public Matrix getTransform(
+        Matrix outTransform,
+        Rect parentBounds,
+        int childWidth,
+        int childHeight,
+        float focusX,
+        float focusY) {
+      // No-op
+      return outTransform;
+    }
+
+    @Override
+    public String getDescription() {
+      return "disabled";
     }
   }
 
@@ -626,13 +662,39 @@ public class ScalingUtils {
     }
 
     @Override
-    public String toString() {
+    public String getDescription() {
       return String.format(
           "InterpolatingScaleType(%s (%s) -> %s (%s))",
           String.valueOf(mScaleTypeFrom),
           String.valueOf(mFocusPointFrom),
           String.valueOf(mScaleTypeTo),
           String.valueOf(mFocusPointTo));
+    }
+  }
+
+  public static class MatrixScaleType implements ScaleType {
+
+    private final Matrix mMatrix;
+
+    public MatrixScaleType(Matrix matrix) {
+      mMatrix = matrix;
+    }
+
+    @Override
+    public Matrix getTransform(
+        Matrix outTransform,
+        Rect parentBounds,
+        int childWidth,
+        int childHeight,
+        float focusX,
+        float focusY) {
+      outTransform.set(mMatrix);
+      return outTransform;
+    }
+
+    @Override
+    public String getDescription() {
+      return "MatrixScaleType";
     }
   }
 }

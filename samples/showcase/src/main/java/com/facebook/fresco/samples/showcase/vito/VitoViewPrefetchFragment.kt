@@ -57,7 +57,7 @@ class VitoViewPrefetchFragment : BaseShowcaseFragment() {
   override fun onCreateView(
       inflater: LayoutInflater,
       container: ViewGroup?,
-      savedInstanceState: Bundle?
+      savedInstanceState: Bundle?,
   ): View {
     _binding = FragmentVitoViewPrefetchBinding.inflate(inflater, container, false)
     return binding.root
@@ -95,7 +95,8 @@ class VitoViewPrefetchFragment : BaseShowcaseFragment() {
       FrescoVitoProvider.getImagePipeline()
           .evictFromCaches(
               FrescoVitoProvider.getImagePipeline()
-                  .createImageRequest(resources, ImageSourceProvider.forUri(uri), imageOptions))
+                  .createImageRequest(resources, ImageSourceProvider.forUri(uri), imageOptions)
+          )
     }
   }
 

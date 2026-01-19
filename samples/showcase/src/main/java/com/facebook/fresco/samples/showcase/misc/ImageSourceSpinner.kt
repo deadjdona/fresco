@@ -17,23 +17,25 @@ object ImageSourceSpinner {
   fun Spinner.setup(
       imageUriProvider: ImageUriProvider,
       callback: (List<@JvmSuppressWildcards Uri>) -> Unit,
-      numEntries: Int = 256
+      numEntries: Int = 256,
   ) {
     setupWithCallbacks(
         listOf(
             "Small images" to
                 {
                   callback.invoke(
-                      imageUriProvider.getRandomSampleUris(
-                          ImageUriProvider.ImageSize.S, numEntries))
+                      imageUriProvider.getRandomSampleUris(ImageUriProvider.ImageSize.S, numEntries)
+                  )
                 },
             "Large images" to
                 {
                   callback.invoke(
-                      imageUriProvider.getRandomSampleUris(
-                          ImageUriProvider.ImageSize.M, numEntries))
+                      imageUriProvider.getRandomSampleUris(ImageUriProvider.ImageSize.M, numEntries)
+                  )
                 },
             "Media" to { callback.invoke(imageUriProvider.getMediaStoreUris(context)) },
-            "Empty list" to { callback.invoke(emptyList()) }))
+            "Empty list" to { callback.invoke(emptyList()) },
+        )
+    )
   }
 }

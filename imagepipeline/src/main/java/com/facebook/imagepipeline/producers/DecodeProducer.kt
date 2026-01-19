@@ -17,6 +17,7 @@ import com.facebook.common.util.ExceptionWithNoStacktrace
 import com.facebook.common.util.UriUtil
 import com.facebook.fresco.middleware.HasExtraData
 import com.facebook.imageformat.DefaultImageFormats
+import com.facebook.imagepipeline.cache.CacheMissException
 import com.facebook.imagepipeline.common.ImageDecodeOptions
 import com.facebook.imagepipeline.core.CloseableReferenceFactory
 import com.facebook.imagepipeline.core.DownsampleMode
@@ -54,24 +55,39 @@ class DecodeProducer(
     val downsampleMode: DownsampleMode,
     val downsampleEnabledForNetwork: Boolean,
     val decodeCancellationEnabled: Boolean,
-    val inputProducer: Producer<EncodedImage?>,
+    val inputProducer: Producer<EncodedImage>,
     val maxBitmapDimension: Int,
     val closeableReferenceFactory: CloseableReferenceFactory,
     val reclaimMemoryRunnable: Runnable?,
-    val recoverFromDecoderOOM: Supplier<Boolean>
+    val recoverFromDecoderOOM: Supplier<Boolean>,
+    val decodedOriginalImageAnalyzers: Set<DecodedOriginalImageAnalyzer>? = null,
 ) : Producer<CloseableReference<CloseableImage>> {
+
+  interface DecodedOriginalImageAnalyzer {
+    fun analyze(
+        context: ProducerContext,
+        imageRef: CloseableReference<CloseableImage>,
+        encodedImage: EncodedImage,
+    )
+  }
 
   override fun produceResults(
       consumer: Consumer<CloseableReference<CloseableImage>>,
-      context: ProducerContext
+      context: ProducerContext,
   ) =
       traceSection("DecodeProducer#produceResults") {
         val imageRequest = context.imageRequest
         val progressiveDecoder =
-            if (!UriUtil.isNetworkUri(imageRequest.sourceUri) &&
-                !ImageRequestBuilder.isCustomNetworkUri(imageRequest.sourceUri)) {
+            if (
+                !UriUtil.isNetworkUri(imageRequest.sourceUri) &&
+                    !ImageRequestBuilder.isCustomNetworkUri(imageRequest.sourceUri)
+            ) {
               LocalImagesProgressiveDecoder(
-                  consumer, context, this.decodeCancellationEnabled, this.maxBitmapDimension)
+                  consumer,
+                  context,
+                  this.decodeCancellationEnabled,
+                  this.maxBitmapDimension,
+              )
             } else {
               val jpegParser = ProgressiveJpegParser(this.byteArrayPool)
               NetworkImagesProgressiveDecoder(
@@ -80,7 +96,8 @@ class DecodeProducer(
                   jpegParser,
                   this.progressiveJpegConfig,
                   this.decodeCancellationEnabled,
-                  this.maxBitmapDimension)
+                  this.maxBitmapDimension,
+              )
             }
         this.inputProducer.produceResults(progressiveDecoder, context)
       }
@@ -89,8 +106,8 @@ class DecodeProducer(
       consumer: Consumer<CloseableReference<CloseableImage>>,
       private val producerContext: ProducerContext,
       decodeCancellationEnabled: Boolean,
-      maxBitmapDimension: Int
-  ) : DelegatingConsumer<EncodedImage?, CloseableReference<CloseableImage>>(consumer) {
+      maxBitmapDimension: Int,
+  ) : DelegatingConsumer<EncodedImage, CloseableReference<CloseableImage>>(consumer) {
     private val TAG = "ProgressiveDecoder"
     private val producerListener: ProducerListener2 = producerContext.producerListener
     private val imageDecodeOptions: ImageDecodeOptions =
@@ -119,11 +136,26 @@ class DecodeProducer(
               val cacheHit =
                   producerContext.getExtra<Boolean>(ProducerConstants.EXTRA_CACHED_VALUE_FOUND) ==
                       true
-              if (!producerContext.imagePipelineConfig.experiments.cancelDecodeOnCacheMiss ||
+              val fullFetch =
                   producerContext.lowestPermittedRequestLevel ==
-                      ImageRequest.RequestLevel.FULL_FETCH ||
-                  cacheHit) {
-                handleError(ExceptionWithNoStacktrace("Encoded image is null."))
+                      ImageRequest.RequestLevel.FULL_FETCH
+
+              val exception =
+                  if (
+                      !fullFetch &&
+                          !cacheHit &&
+                          producerContext.imagePipelineConfig.experiments
+                              .throwCacheMissExceptionOnCacheMiss
+                  )
+                      CacheMissException("Image not found in cache")
+                  else ExceptionWithNoStacktrace("Encoded image is null.")
+
+              if (
+                  !producerContext.imagePipelineConfig.experiments.cancelDecodeOnCacheMiss ||
+                      fullFetch ||
+                      cacheHit
+              ) {
+                handleError(exception)
                 return
               }
             } else if (!newResult.isValid) {
@@ -160,7 +192,7 @@ class DecodeProducer(
     private fun doDecode(
         encodedImage: EncodedImage,
         @Consumer.Status status: Int,
-        lastScheduledScanNumber: Int
+        lastScheduledScanNumber: Int,
     ) {
       // do not run for partial results of anything except JPEG
       var newStatus = status
@@ -170,17 +202,20 @@ class DecodeProducer(
       if (isFinished || !EncodedImage.isValid(encodedImage)) {
         return
       }
-      if (encodedImage.imageFormat == DefaultImageFormats.GIF &&
-          isTooBig(encodedImage, imageDecodeOptions)) {
+      if (
+          encodedImage.imageFormat == DefaultImageFormats.GIF &&
+              isTooBig(encodedImage, imageDecodeOptions)
+      ) {
         val e =
             IllegalStateException(
-                "Image is too big to attempt decoding: w = ${encodedImage.width}, h = ${encodedImage.height}, pixel config = ${imageDecodeOptions.bitmapConfig}, max bitmap size = $MAX_BITMAP_SIZE")
+                "Image is too big to attempt decoding: w = ${encodedImage.width}, h = ${encodedImage.height}, pixel config = ${imageDecodeOptions.bitmapConfig}, max bitmap size = $MAX_BITMAP_SIZE"
+            )
         producerListener.onProducerFinishWithFailure(producerContext, PRODUCER_NAME, e, null)
         handleError(e)
         return
       }
       val imageFormat = encodedImage.imageFormat
-      val imageFormatStr = imageFormat?.name ?: "unknown"
+      val imageFormatStr = imageFormat.name ?: "unknown"
       val encodedImageSize = encodedImage.width.toString() + "x" + encodedImage.height
       val sampleSize = encodedImage.sampleSize.toString()
       val isLast = isLast(status)
@@ -216,8 +251,10 @@ class DecodeProducer(
                     e.message,
                     requestUri,
                     failedEncodedImage.getFirstBytesAsHexString(
-                        DECODE_EXCEPTION_MESSAGE_NUM_HEADER_BYTES),
-                    failedEncodedImage.size)
+                        DECODE_EXCEPTION_MESSAGE_NUM_HEADER_BYTES
+                    ),
+                    failedEncodedImage.size,
+                )
                 throw e
               }
           if (encodedImage.sampleSize != EncodedImage.DEFAULT_SAMPLE_SIZE) {
@@ -233,7 +270,8 @@ class DecodeProducer(
                   imageFormatStr,
                   encodedImageSize,
                   requestedSizeStr,
-                  sampleSize)
+                  sampleSize,
+              )
           producerListener.onProducerFinishWithFailure(producerContext, PRODUCER_NAME, e, extraMap)
           handleError(e)
           return
@@ -247,10 +285,11 @@ class DecodeProducer(
                 imageFormatStr,
                 encodedImageSize,
                 requestedSizeStr,
-                sampleSize)
+                sampleSize,
+            )
         producerListener.onProducerFinishWithSuccess(producerContext, PRODUCER_NAME, extraMap)
         setImageExtras(encodedImage, image, lastScheduledScanNumber)
-        handleResult(image, newStatus)
+        handleResult(image, newStatus, encodedImage)
       } finally {
         EncodedImage.closeSafely(encodedImage)
       }
@@ -260,7 +299,7 @@ class DecodeProducer(
     private fun internalDecode(
         encodedImage: EncodedImage,
         length: Int,
-        quality: QualityInfo
+        quality: QualityInfo,
     ): CloseableImage? {
       val recover = reclaimMemoryRunnable != null && recoverFromDecoderOOM.get()
       val image =
@@ -271,7 +310,7 @@ class DecodeProducer(
               throw e
             }
 
-            reclaimMemoryRunnable?.run()
+            reclaimMemoryRunnable.run()
             System.gc()
 
             // Now we retry only once
@@ -283,7 +322,7 @@ class DecodeProducer(
     private fun setImageExtras(
         encodedImage: EncodedImage,
         image: CloseableImage?,
-        lastScheduledScanNumber: Int
+        lastScheduledScanNumber: Int,
     ) {
       producerContext.putExtra(HasExtraData.KEY_ENCODED_WIDTH, encodedImage.width)
       producerContext.putExtra(HasExtraData.KEY_ENCODED_HEIGHT, encodedImage.height)
@@ -306,7 +345,7 @@ class DecodeProducer(
         imageFormatName: String,
         encodedImageSize: String,
         requestImageSize: String,
-        sampleSize: String
+        sampleSize: String,
     ): Map<String, String>? {
       if (!producerListener.requiresExtraMap(producerContext, PRODUCER_NAME)) {
         return null
@@ -368,11 +407,23 @@ class DecodeProducer(
     }
 
     /** Notifies consumer of new result and finishes if the result is final. */
-    private fun handleResult(decodedImage: CloseableImage?, @Consumer.Status status: Int) {
+    private fun handleResult(
+        decodedImage: CloseableImage?,
+        @Consumer.Status status: Int,
+        encodedImage: EncodedImage,
+    ) {
       val decodedImageRef: CloseableReference<CloseableImage>? =
           closeableReferenceFactory.create(decodedImage)
       try {
-        maybeFinish(isLast(status))
+        val isLast = isLast(status)
+        maybeFinish(isLast)
+        if (isLast) {
+          decodedOriginalImageAnalyzers?.forEach {
+            if (decodedImageRef != null) {
+              it.analyze(producerContext, decodedImageRef, encodedImage)
+            }
+          }
+        }
         consumer.onNewResult(decodedImageRef, status)
       } finally {
         CloseableReference.closeSafely(decodedImageRef)
@@ -400,7 +451,7 @@ class DecodeProducer(
         if (encodedImage != null) {
           val request = producerContext.imageRequest
           producerContext.putExtra(HasExtraData.KEY_IMAGE_FORMAT, encodedImage.imageFormat.name)
-          encodedImage.source = request.sourceUri?.toString()
+          encodedImage.source = request.sourceUri.toString()
 
           val requestDownsampleMode = request.downsampleOverride ?: downsampleMode
           val isResizingDone = statusHasFlag(status, Consumer.IS_RESIZING_DONE)
@@ -414,7 +465,8 @@ class DecodeProducer(
                     request.rotationOptions,
                     request.resizeOptions,
                     encodedImage,
-                    maxBitmapDimension)
+                    maxBitmapDimension,
+                )
           }
 
           if (producerContext.imagePipelineConfig.experiments.downsampleIfLargeBitmap) {
@@ -437,7 +489,8 @@ class DecodeProducer(
                 handleCancellation()
               }
             }
-          })
+          }
+      )
     }
   }
 
@@ -445,12 +498,12 @@ class DecodeProducer(
       consumer: Consumer<CloseableReference<CloseableImage>>,
       producerContext: ProducerContext,
       decodeCancellationEnabled: Boolean,
-      maxBitmapDimension: Int
+      maxBitmapDimension: Int,
   ) : ProgressiveDecoder(consumer, producerContext, decodeCancellationEnabled, maxBitmapDimension) {
     @Synchronized
     override fun updateDecodeJob(
         encodedImage: EncodedImage?,
-        @Consumer.Status status: Int
+        @Consumer.Status status: Int,
     ): Boolean =
         if (isNotLast(status)) {
           false
@@ -466,25 +519,27 @@ class DecodeProducer(
 
   private inner class NetworkImagesProgressiveDecoder(
       consumer: Consumer<CloseableReference<CloseableImage>>,
-      producerContext: ProducerContext,
+      val producerContext: ProducerContext,
       val progressiveJpegParser: ProgressiveJpegParser,
       val progressiveJpegConfig: ProgressiveJpegConfig,
       decodeCancellationEnabled: Boolean,
-      maxBitmapDimension: Int
+      maxBitmapDimension: Int,
   ) : ProgressiveDecoder(consumer, producerContext, decodeCancellationEnabled, maxBitmapDimension) {
     @Synchronized
     override fun updateDecodeJob(
         encodedImage: EncodedImage?,
-        @Consumer.Status status: Int
+        @Consumer.Status status: Int,
     ): Boolean {
       if (encodedImage == null) {
         return false
       }
       val ret = super.updateDecodeJob(encodedImage, status)
-      if ((isNotLast(status) || statusHasFlag(status, Consumer.IS_PARTIAL_RESULT)) &&
-          !statusHasFlag(status, Consumer.IS_PLACEHOLDER) &&
-          EncodedImage.isValid(encodedImage) &&
-          encodedImage.imageFormat === DefaultImageFormats.JPEG) {
+      if (
+          (isNotLast(status) || statusHasFlag(status, Consumer.IS_PARTIAL_RESULT)) &&
+              !statusHasFlag(status, Consumer.IS_PLACEHOLDER) &&
+              EncodedImage.isValid(encodedImage) &&
+              encodedImage.imageFormat === DefaultImageFormats.JPEG
+      ) {
         if (!this.progressiveJpegParser.parseMoreData(encodedImage)) {
           return false
         }
@@ -493,8 +548,13 @@ class DecodeProducer(
           // We have already decoded this scan, no need to do so again
           return false
         }
-        if (scanNum < progressiveJpegConfig.getNextScanNumberToDecode(lastScheduledScanNumber) &&
-            !this.progressiveJpegParser.isEndMarkerRead) {
+        if (
+            scanNum <
+                progressiveJpegConfig.getNextScanNumberToDecode(
+                    producerContext.imageRequest,
+                    lastScheduledScanNumber,
+                ) && !this.progressiveJpegParser.isEndMarkerRead
+        ) {
           // We have not reached the minimum scan set by the configuration and there
           // are still more scans to be read (the end marker is not reached)
           return false
@@ -509,7 +569,10 @@ class DecodeProducer(
 
     override val qualityInfo: QualityInfo
       protected get() =
-          progressiveJpegConfig.getQualityInfo(this.progressiveJpegParser.bestScanNumber)
+          progressiveJpegConfig.getQualityInfo(
+              producerContext.imageRequest,
+              this.progressiveJpegParser.bestScanNumber,
+          )
 
     init {
       lastScheduledScanNumber = 0
@@ -538,7 +601,7 @@ class DecodeProducer(
 
     private fun isTooBig(
         encodedImage: EncodedImage,
-        imageDecodeOptions: ImageDecodeOptions
+        imageDecodeOptions: ImageDecodeOptions,
     ): Boolean {
       val w: Long = encodedImage.width.toLong()
       val h: Long = encodedImage.height.toLong()

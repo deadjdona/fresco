@@ -23,6 +23,7 @@ import com.facebook.imagepipeline.core.DownsampleMode;
 import com.facebook.imagepipeline.core.ImagePipelineConfig;
 import com.facebook.imagepipeline.core.ImagePipelineExperiments;
 import com.facebook.imagepipeline.listener.RequestListener;
+import com.facebook.infer.annotation.FalseOnNull;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -40,6 +41,7 @@ public class ImageRequestBuilder {
   private CacheChoice mCacheChoice = CacheChoice.DEFAULT;
   private boolean mProgressiveRenderingEnabled =
       ImagePipelineConfig.getDefaultImageRequestConfig().isProgressiveRenderingEnabled();
+  private boolean mSkipEncodedPartialImagesInCachesNotInRequestRange = false;
   private boolean mLocalThumbnailPreviewsEnabled = false;
   private boolean mLoadThumbnailOnly = false;
   private Priority mRequestPriority = Priority.HIGH;
@@ -51,6 +53,7 @@ public class ImageRequestBuilder {
   private @Nullable DownsampleMode mDownsampleOverride = null;
   private int mDelayMs;
   private @Nullable String mDiskCacheId = null;
+  private Boolean mIsFirstFrameThumbnailEnabled = false;
 
   /**
    * Creates a new request builder instance. The setting will be done according to the source type.
@@ -108,7 +111,10 @@ public class ImageRequestBuilder {
         .setDelayMs(imageRequest.getDelayMs())
         .setDiskCacheId(imageRequest.getDiskCacheId())
         .setDownsampleOverride(imageRequest.getDownsampleOverride())
-        .setResizingAllowedOverride(imageRequest.getResizingAllowedOverride());
+        .setResizingAllowedOverride(imageRequest.getResizingAllowedOverride())
+        .setIsFirstFrameThumbnailEnabled(imageRequest.isFirstFrameThumbnailEnabled())
+        .setSkipEncodedPartialImagesInCachesNotInRequestRange(
+            imageRequest.getSkipEncodedPartialImagesInCachesNotInRequestRange());
   }
 
   public static void addCustomUriNetworkScheme(String scheme) {
@@ -282,6 +288,24 @@ public class ImageRequestBuilder {
     return this;
   }
 
+  /**
+   * Enables or disables skipping partial cached images in disk cache.
+   *
+   * @param skipEncodedPartialImagesInCachesNotInRequestRange
+   * @return the modified builder instance
+   */
+  public ImageRequestBuilder setSkipEncodedPartialImagesInCachesNotInRequestRange(
+      boolean skipEncodedPartialImagesInCachesNotInRequestRange) {
+    mSkipEncodedPartialImagesInCachesNotInRequestRange =
+        skipEncodedPartialImagesInCachesNotInRequestRange;
+    return this;
+  }
+
+  /** Returns whether skipping encoded partial images in caches is enabled. */
+  public boolean getSkipEncodedPartialImagesInCachesNotInRequestRange() {
+    return mSkipEncodedPartialImagesInCachesNotInRequestRange;
+  }
+
   /** Returns whether progressive loading is enabled. */
   public boolean isProgressiveRenderingEnabled() {
     return mProgressiveRenderingEnabled;
@@ -320,6 +344,7 @@ public class ImageRequestBuilder {
     return this;
   }
 
+  @FalseOnNull
   public static boolean isCustomNetworkUri(@Nullable Uri uri) {
     if (CUSTOM_NETWORK_SCHEMES == null || uri == null) {
       return false;
@@ -468,6 +493,15 @@ public class ImageRequestBuilder {
 
   public int getDelayMs() {
     return mDelayMs;
+  }
+
+  public ImageRequestBuilder setIsFirstFrameThumbnailEnabled(Boolean isFirstFrameThumbnailEnabled) {
+    this.mIsFirstFrameThumbnailEnabled = isFirstFrameThumbnailEnabled;
+    return this;
+  }
+
+  public Boolean getIsFirstFrameThumbnailEnabled() {
+    return mIsFirstFrameThumbnailEnabled;
   }
 
   /** Add an artificial delay for this image, in milliseconds. */

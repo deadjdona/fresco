@@ -18,6 +18,7 @@ import com.facebook.common.logging.FLog
 import com.facebook.drawable.base.DrawableWithCaches
 import com.facebook.drawee.drawable.DrawableProperties
 import com.facebook.fresco.animation.backend.AnimationBackend
+import com.facebook.fresco.animation.bitmap.BitmapAnimationBackend
 import com.facebook.fresco.animation.frame.DropFramesFrameScheduler
 import com.facebook.fresco.animation.frame.FrameScheduler
 import kotlin.concurrent.Volatile
@@ -45,7 +46,7 @@ constructor(private var _animationBackend: AnimationBackend? = null) :
         actualRenderTimeStartMs: Long,
         actualRenderTimeEndMs: Long,
         startRenderTimeForNextFrameMs: Long,
-        scheduledRenderTimeForNextFrameMs: Long
+        scheduledRenderTimeForNextFrameMs: Long,
     )
   }
 
@@ -135,6 +136,7 @@ constructor(private var _animationBackend: AnimationBackend? = null) :
     expectedRenderTimeMs = startTimeMs
     lastFrameAnimationTimeMs = -1
     lastDrawnFrameNumber = -1
+    _animationBackend?.clear()
     unscheduleSelf(invalidateRunnable)
     animationListener.onAnimationStop(this)
   }
@@ -165,11 +167,20 @@ constructor(private var _animationBackend: AnimationBackend? = null) :
     var frameNumberToDraw =
         frameScheduler!!.getFrameNumberToRender(animationTimeMs, lastFrameAnimationTimeMs)
 
-    // Check if the animation is finished and draw last frame if so
+    // Check if the animation is finished and draw last frame
     if (frameNumberToDraw == FrameScheduler.FRAME_NUMBER_DONE) {
       frameNumberToDraw = _animationBackend!!.frameCount - 1
-      animationListener.onAnimationStop(this)
-      _isRunning = false
+
+      // Check if the animation is finished and draw the fallback thumbnail if
+      // useFallbackThumbnail is true
+      val bitmapBackend = _animationBackend as? BitmapAnimationBackend
+      val animatedOptions = bitmapBackend?.animatedOptions
+      val useFallbackThumbnail = animatedOptions?.useFallbackThumbnail() == true
+
+      if (!useFallbackThumbnail) {
+        animationListener.onAnimationStop(this)
+        _isRunning = false
+      }
     } else if (frameNumberToDraw == 0) {
       if (lastDrawnFrameNumber != -1 && actualRenderTimeStartMs >= expectedRenderTimeMs) {
         animationListener.onAnimationRepeat(this)
@@ -219,7 +230,8 @@ constructor(private var _animationBackend: AnimationBackend? = null) :
         actualRenderTimeStartMs,
         actualRenderTimeEnd,
         targetRenderTimeForNextFrameMs,
-        scheduledRenderTimeForNextFrameMs)
+        scheduledRenderTimeForNextFrameMs,
+    )
     lastFrameAnimationTimeMs = animationTimeMs
   }
 

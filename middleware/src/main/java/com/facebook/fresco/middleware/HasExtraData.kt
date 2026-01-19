@@ -33,13 +33,15 @@ interface HasExtraData {
     const val KEY_NON_FATAL_DECODE_ERROR = "non_fatal_decode_error"
 
     /** The original URL if it was modified by Dynamic Image URL */
-    const val KEY_ORIGINAL_URL = "original_url"
+    const val KEY_SF_ORIGINAL_URL = "smart_original_url"
 
     /** Information on if/why the url was modified by Dynamic Image URL */
     const val KEY_SF_FETCH_STRATEGY = "smart_fetch_strategy"
     const val KEY_SF_MOD_RESULT = "smart_mod_result"
     const val KEY_SF_ADAPTIVE = "smart_adaptive"
-    const val KEY_IMAGE_SOURCE_TYPE: String = "image_source_type"
+    const val KEY_SF_VARIATION = "smart_variation"
+    const val KEY_SF_QUERY = "smart_query"
+    const val KEY_SF_AIQ = "smart_aiq"
 
     const val KEY_ORIGIN = "origin"
     const val KEY_ORIGIN_SUBCATEGORY = "origin_sub"
@@ -56,6 +58,8 @@ interface HasExtraData {
     const val KEY_COLOR_SPACE = "image_color_space"
 
     const val KEY_VIEWPORT = "viewport"
+    const val KEY_SCALETYPE = "scaletype"
+    const val KEY_SIZING_HINT = "sizing_hint"
     const val KEY_IMAGEOPTIONS = "imageoptions"
 
     /* HDR related image extra data */

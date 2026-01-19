@@ -23,7 +23,6 @@ import android.widget.ImageView
 import com.facebook.drawee.drawable.ScalingUtils
 import com.facebook.drawee.drawable.ScalingUtils.InterpolatingScaleType
 import com.facebook.fresco.vito.view.VitoView
-import com.facebook.infer.annotation.Nullsafe
 
 /**
  * This Transition animates changes of an [ImageView] using Vito between two ScaleTypes
@@ -31,7 +30,6 @@ import com.facebook.infer.annotation.Nullsafe
  * In combination with ChangeBounds, VitoTransition allows ImageViews that change size, shape, or
  * [ScalingUtils.ScaleType] to animate contents smoothly.
  */
-@Nullsafe(Nullsafe.Mode.LOCAL)
 @TargetApi(Build.VERSION_CODES.KITKAT)
 class VitoTransition
 @JvmOverloads
@@ -40,7 +38,7 @@ constructor(
     private val fromScale: ScalingUtils.ScaleType,
     private val toScale: ScalingUtils.ScaleType,
     private val fromFocusPoint: PointF? = null,
-    private val toFocusPoint: PointF? = null
+    private val toFocusPoint: PointF? = null,
 ) : Transition() {
   override fun captureStartValues(transitionValues: TransitionValues) {
     captureValues(transitionValues)
@@ -68,14 +66,21 @@ constructor(
     val imageView = startValues.view
     val scaleType =
         InterpolatingScaleType(
-            fromScale, toScale, startBounds, endBounds, fromFocusPoint, toFocusPoint)
+            fromScale,
+            toScale,
+            startBounds,
+            endBounds,
+            fromFocusPoint,
+            toFocusPoint,
+        )
     val vitoDrawable = VitoView.getDrawable(imageView) ?: return null
     val originalVitoImageRequest = vitoDrawable.imageRequest ?: return null
     VitoView.show(
         originalVitoImageRequest.imageSource,
         originalVitoImageRequest.imageOptions.extend().scale(scaleType).build(),
         callerContext,
-        imageView)
+        imageView,
+    )
 
     val animator = ValueAnimator.ofFloat(0f, 1f)
     animator.addUpdateListener { animation ->
@@ -93,9 +98,11 @@ constructor(
                     .focusPoint(toFocusPoint)
                     .build(),
                 callerContext,
-                imageView)
+                imageView,
+            )
           }
-        })
+        }
+    )
 
     return animator
   }
@@ -117,12 +124,13 @@ constructor(
         fromScale: ScalingUtils.ScaleType,
         toScale: ScalingUtils.ScaleType,
         fromFocusPoint: PointF? = null,
-        toFocusPoint: PointF? = null
+        toFocusPoint: PointF? = null,
     ): TransitionSet {
       val transitionSet = TransitionSet()
       transitionSet.addTransition(ChangeBounds())
       transitionSet.addTransition(
-          VitoTransition(callerContext, fromScale, toScale, fromFocusPoint, toFocusPoint))
+          VitoTransition(callerContext, fromScale, toScale, fromFocusPoint, toFocusPoint)
+      )
       return transitionSet
     }
   }

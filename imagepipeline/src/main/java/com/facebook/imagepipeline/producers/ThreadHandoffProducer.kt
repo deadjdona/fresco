@@ -15,7 +15,7 @@ import java.lang.Exception
 /** Uses ExecutorService to move further computation to different thread */
 class ThreadHandoffProducer<T>(
     val inputProducer: Producer<T>,
-    val threadHandoffProducerQueue: ThreadHandoffProducerQueue
+    val threadHandoffProducerQueue: ThreadHandoffProducerQueue,
 ) : Producer<T> {
 
   override fun produceResults(consumer: Consumer<T>, context: ProducerContext) {
@@ -47,9 +47,11 @@ class ThreadHandoffProducer<T>(
               statefulRunnable.cancel()
               threadHandoffProducerQueue.remove(statefulRunnable)
             }
-          })
+          }
+      )
       threadHandoffProducerQueue.addToQueueOrExecute(
-          FrescoInstrumenter.decorateRunnable(statefulRunnable, getInstrumentationTag(context)))
+          FrescoInstrumenter.decorateRunnable(statefulRunnable, getInstrumentationTag(context))
+      )
     }
   }
 

@@ -22,17 +22,17 @@ object PlatformBitmapFactoryProvider {
    * @return The PlatformBitmapFactory implementation
    */
   @JvmStatic
+  @JvmOverloads
   fun buildPlatformBitmapFactory(
       poolFactory: PoolFactory,
       platformDecoder: PlatformDecoder,
-      closeableReferenceFactory: CloseableReferenceFactory
-  ): PlatformBitmapFactory =
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        ArtBitmapFactory(poolFactory.bitmapPool, closeableReferenceFactory)
-      } else {
-        HoneycombBitmapFactory(
-            EmptyJpegGenerator(poolFactory.pooledByteBufferFactory),
-            platformDecoder,
-            closeableReferenceFactory)
-      }
+      closeableReferenceFactory: CloseableReferenceFactory,
+      useAshmem: Boolean = false,
+  ): PlatformBitmapFactory {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      Api31BitmapFactory(poolFactory.bitmapPool, closeableReferenceFactory, useAshmem)
+    } else {
+      ArtBitmapFactory(poolFactory.bitmapPool, closeableReferenceFactory)
+    }
+  }
 }

@@ -28,17 +28,13 @@ import com.facebook.fresco.vito.core.FrescoVitoConfig
 import com.facebook.fresco.vito.core.ImagePipelineUtils
 import com.facebook.fresco.vito.core.VitoImagePipeline
 import com.facebook.fresco.vito.core.VitoImageRequest
-import com.facebook.fresco.vito.core.impl.source.ImagePipelineImageSource
 import com.facebook.fresco.vito.options.ImageOptions
 import com.facebook.fresco.vito.options.ImageOptions.Companion.defaults
-import com.facebook.fresco.vito.source.BitmapImageSource
-import com.facebook.fresco.vito.source.DrawableImageSource
-import com.facebook.fresco.vito.source.EmptyImageSource
 import com.facebook.fresco.vito.source.FirstAvailableImageSource
 import com.facebook.fresco.vito.source.ImageSource
 import com.facebook.fresco.vito.source.ImageSourceProvider
 import com.facebook.fresco.vito.source.IncreasingQualityImageSource
-import com.facebook.fresco.vito.source.SingleImageSource
+import com.facebook.fresco.vito.source.SmartImageSource
 import com.facebook.fresco.vito.source.UriImageSource
 import com.facebook.imagepipeline.core.ImagePipeline
 import com.facebook.imagepipeline.image.CloseableImage
@@ -50,7 +46,7 @@ import java.util.concurrent.TimeUnit
 class VitoImagePipelineImpl(
     private val imagePipeline: ImagePipeline,
     private val imagePipelineUtils: ImagePipelineUtils,
-    private val config: FrescoVitoConfig
+    private val config: FrescoVitoConfig,
 ) : VitoImagePipeline {
 
   override fun createImageRequest(
@@ -77,11 +73,17 @@ class VitoImagePipelineImpl(
                   viewport?.let { Dimensions(it.width(), it.height()) },
                   imageOptions.actualImageScaleType,
                   callerContext,
-                  contextChain)
+                  contextChain,
+              )
           modifiedUriValue = result.toString()
           if (result is UriModifierInterface.ModificationResult.Modified) {
-            finalImageSource = ImageSourceProvider.forUri(result.newUri)
-            extras[HasExtraData.KEY_ORIGINAL_URL] = imageSource.imageUri
+            finalImageSource =
+                if (imageSource is SmartImageSource) {
+                  SmartImageSource(result.newUri, imageSource.sizingHint, imageSource.extras)
+                } else {
+                  ImageSourceProvider.forUri(result.newUri)
+                }
+            extras[HasExtraData.KEY_SF_ORIGINAL_URL] = imageSource.imageUri
           }
         } else {
           modifiedUriValue = "NotSupportedImageSource: ${imageSource.getClassNameString()}"
@@ -103,17 +105,24 @@ class VitoImagePipelineImpl(
 
     fetchStrategy?.let { extras[HasExtraData.KEY_SF_FETCH_STRATEGY] = it }
     modifiedUriValue?.let { extras[HasExtraData.KEY_SF_MOD_RESULT] = it }
-    extras[HasExtraData.KEY_IMAGE_SOURCE_TYPE] = imageSource.getClassNameString()
 
     if (imageSource is IncreasingQualityImageSource) {
       imageSource.extras?.let { extras[HasExtraData.KEY_IMAGE_SOURCE_EXTRAS] = it }
     } else if (imageSource is UriImageSource) {
       imageSource.extras?.let { extras[HasExtraData.KEY_IMAGE_SOURCE_EXTRAS] = it }
+    } else if (imageSource is FirstAvailableImageSource) {
+      val firstImageSource = imageSource.imageSources.firstOrNull()
+      if (firstImageSource is UriImageSource) {
+        firstImageSource.extras?.let { extras[HasExtraData.KEY_IMAGE_SOURCE_EXTRAS] = it }
+      }
     }
 
     val finalImageRequest =
         ImageSourceToImagePipelineAdapter.maybeExtractFinalImageRequest(
-            finalImageSource, imagePipelineUtils, imageOptions)
+            finalImageSource,
+            imagePipelineUtils,
+            imageOptions,
+        )
     val finalImageCacheKey = finalImageRequest?.let { imagePipeline.getCacheKey(it, null) }
 
     return VitoImageRequest(
@@ -124,7 +133,8 @@ class VitoImagePipelineImpl(
         finalImageRequest,
         finalImageCacheKey,
         extras,
-        viewport = viewport?.asDimensions())
+        viewport = viewport?.asDimensions(),
+    )
   }
 
   override fun getCachedImage(imageRequest: VitoImageRequest): CloseableReference<CloseableImage>? =
@@ -167,7 +177,7 @@ class VitoImagePipelineImpl(
   override fun isInDiskCacheSync(
       vitoImageRequest: VitoImageRequest,
       timeout: Long,
-      unit: TimeUnit
+      unit: TimeUnit,
   ): Boolean? {
     if (timeout <= 0) {
       return isInDiskCacheSync(vitoImageRequest)
@@ -196,25 +206,10 @@ class VitoImagePipelineImpl(
   private fun experimentalDynamicSizeWithCacheFallbackVito2(): Boolean =
       config.experimentalDynamicSizeWithCacheFallbackVito2()
 
-  private fun ImageSource.getClassNameString(): String {
-    return when (this) {
-      is BitmapImageSource -> "BitmapImageSource"
-      is DrawableImageSource -> "DrawableImageSource"
-      is EmptyImageSource -> "EmptyImageSource"
-      is FirstAvailableImageSource -> "FirstAvailableImageSource"
-      is IncreasingQualityImageSource -> "IncreasingQualityImageSource"
-      is ImagePipelineImageSource -> "ImagePipelineImageSource"
-      is SingleImageSource -> "SingleImageSource"
-      // Keep UriImageSource below known subclasses ImagePipelineImageSource/SingleImageSource
-      is UriImageSource -> "UriImageSource"
-      else -> "Other"
-    }
-  }
-
   override fun determineFetchStrategy(
       requestBeforeLayout: VitoImageRequest?,
       callerContext: Any?,
-      contextChain: ContextChain?
+      contextChain: ContextChain?,
   ): FetchStrategy {
     if (requestBeforeLayout == null) {
       if (experimentalDynamicSizeVito2()) {
@@ -228,8 +223,27 @@ class VitoImagePipelineImpl(
       return ClassicFetchStrategy.APP_DISABLED
     }
 
-    if (experimentalDynamicSizeWithCacheFallbackVito2() &&
-        Looper.myLooper() == Looper.getMainLooper()) {
+    requestBeforeLayout.finalImageRequest?.sourceUri.let { uri ->
+      if (!config.experimentalDynamicSizeIsUriEligible(uri)) {
+        return ClassicFetchStrategy.URI_INELIGIBLE
+      }
+    }
+
+    if (isProductEnabled(callerContext, contextChain) == false) {
+      return ClassicFetchStrategy.PRODUCT_DISABLED
+    }
+
+    if (
+        experimentalDynamicSizeWithCacheFallbackVito2() &&
+            !isFallbackEnabled(callerContext, contextChain)
+    ) {
+      return SmartFetchStrategy.FALLBACK_DISABLED
+    }
+
+    if (
+        experimentalDynamicSizeWithCacheFallbackVito2() &&
+            Looper.myLooper() == Looper.getMainLooper()
+    ) {
       // We don't want to check cache if we are running on the main thread
       // By default uses the original URL
       val shouldSmartFetchOnMainThread = config.experimentalDynamicSizeOnPrepareMainThreadVito2()
@@ -240,17 +254,15 @@ class VitoImagePipelineImpl(
       }
     }
 
-    if (isProductEnabled(callerContext, contextChain) == false) {
-      return ClassicFetchStrategy.PRODUCT_DISABLED
-    }
-
     if (config.experimentalDynamicSizeDisableWhenAppIsStarting() && config.isAppStarting()) {
       return ClassicFetchStrategy.APP_STARTING
     }
 
     if (experimentalDynamicSizeWithCacheFallbackVito2()) {
-      if (config.experimentalDynamicSizeBloksDisableDiskCacheCheck() &&
-          config.isCallerContextBloks(callerContext)) {
+      if (
+          config.experimentalDynamicSizeBloksDisableDiskCacheCheck() &&
+              config.isCallerContextBloks(callerContext)
+      ) {
         return SmartFetchStrategy.DEFAULT
       }
 
@@ -258,7 +270,8 @@ class VitoImagePipelineImpl(
           isInDiskCacheSync(
               requestBeforeLayout,
               config.experimentalDynamicSizeDiskCacheCheckTimeoutMs(),
-              TimeUnit.MILLISECONDS)
+              TimeUnit.MILLISECONDS,
+          )
 
       if (isInDiskCache == null) {
         // Disk cache request timed out
@@ -283,5 +296,9 @@ class VitoImagePipelineImpl(
       return null
     }
     return config.experimentalDynamicSizeIsProductEnabled(callerContext, contextChain)
+  }
+
+  private fun isFallbackEnabled(callerContext: Any?, contextChain: ContextChain?): Boolean {
+    return config.experimentalDynamicSizeIsFallbackEnabled(callerContext, contextChain)
   }
 }

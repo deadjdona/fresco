@@ -9,7 +9,6 @@
 
 #include <android/bitmap.h>
 #include <android/log.h>
-#include <angliru/Angliru.h>
 #include <jni.h>
 #include <unistd.h>
 #include <algorithm>
@@ -22,6 +21,12 @@
 #include "gif_lib.h"
 #include "locks.h"
 #include "secure_memcpy.h"
+
+#ifdef __ANGLIRU__
+#include <angliru/Angliru.h>
+#else
+#define __ANGLIRU_SOURCE__
+#endif // For Angliru analysis
 
 #if defined(__has_include) && __has_include(<jni/jni_helpers.h>)
 #include <jni/jni_helpers.h>
@@ -80,11 +85,7 @@ class BytesDataWrapper : public DataWrapper {
     size_t endPosition = rangeAdd(m_position, size, m_length);
     size_t readSize = endPosition - m_position;
     if (try_checked_memcpy(
-            dest,
-            m_length - m_position, // total buffer len - current position =
-                                   // # of remaining bytes in dest
-            m_pBuffer.data() + m_position,
-            readSize) != 0) {
+            dest, size, m_pBuffer.data() + m_position, readSize) != 0) {
       return 0; // memcpy error
     } else {
       m_position = endPosition;
@@ -920,6 +921,12 @@ jobject GifImage_nativeCreateFromNativeMemory(
     jint maxDimension,
     jboolean forceStatic) {
   jbyte* const pointer = (jbyte*)nativePtr;
+
+  if (sizeInBytes < 0) {
+    throwIllegalArgumentException(pEnv, "Size must be non-negative");
+    return 0;
+  }
+
   std::vector<uint8_t> vBuffer(pointer, pointer + sizeInBytes);
   return GifImage_nativeCreateFromByteVector(
       pEnv, vBuffer, maxDimension, forceStatic);

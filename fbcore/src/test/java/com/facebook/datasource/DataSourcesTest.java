@@ -7,38 +7,34 @@
 
 package com.facebook.datasource;
 
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mockConstruction;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.MockedConstruction;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.core.classloader.annotations.PowerMockIgnore;
-import org.powermock.core.classloader.annotations.PrepareOnlyThisForTest;
-import org.powermock.modules.junit4.rule.PowerMockRule;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-@PrepareOnlyThisForTest({DataSources.class})
-@PowerMockIgnore({"org.mockito.*", "org.robolectric.*", "androidx.*", "android.*"})
 public class DataSourcesTest {
-
-  @Rule public PowerMockRule rule = new PowerMockRule();
 
   private CountDownLatch mCountDownLatch;
   private Exception mException;
   private DataSource<Object> mDataSource;
+  private MockedConstruction<CountDownLatch> mMockedCountDownLatchConstruction;
 
   private final Object mFinalResult = "final";
   private final Object mIntermediateResult = "intermediate";
@@ -47,22 +43,29 @@ public class DataSourcesTest {
   public void setUp() throws Exception {
     mException = mock(Exception.class);
     mDataSource = mock(DataSource.class);
+    mMockedCountDownLatchConstruction =
+        mockConstruction(
+            CountDownLatch.class,
+            (mock, context) -> {
+              mCountDownLatch = mock;
+            });
+  }
 
-    PowerMockito.mockStatic(CountDownLatch.class);
-    mCountDownLatch = mock(CountDownLatch.class);
-    PowerMockito.whenNew(CountDownLatch.class)
-        .withAnyArguments()
-        .thenAnswer((Answer<CountDownLatch>) invocation -> mCountDownLatch);
+  @After
+  public void tearDown() {
+    if (mMockedCountDownLatchConstruction != null) {
+      mMockedCountDownLatchConstruction.close();
+    }
   }
 
   @Test
   public void testImmediateFailedDataSource() {
     DataSource<?> dataSource = DataSources.immediateFailedDataSource(mException);
-    assertTrue(dataSource.isFinished());
-    assertTrue(dataSource.hasFailed());
-    assertEquals(mException, dataSource.getFailureCause());
-    assertFalse(dataSource.hasResult());
-    assertFalse(dataSource.isClosed());
+    assertThat(dataSource.isFinished()).isTrue();
+    assertThat(dataSource.hasFailed()).isTrue();
+    assertThat(dataSource.getFailureCause()).isEqualTo(mException);
+    assertThat(dataSource.hasResult()).isFalse();
+    assertThat(dataSource.isClosed()).isFalse();
   }
 
   @Test
@@ -84,7 +87,7 @@ public class DataSourcesTest {
         .subscribe(any(DataSubscriber.class), any(Executor.class));
 
     final Object actual = DataSources.waitForFinalResult(mDataSource);
-    assertEquals(mFinalResult, actual);
+    assertThat(actual).isEqualTo(mFinalResult);
 
     verify(mCountDownLatch, times(1)).await();
     verify(mCountDownLatch, times(1)).countDown();
@@ -103,8 +106,8 @@ public class DataSourcesTest {
     } catch (Throwable t) {
       throwable = t;
     }
-    assertEquals(initial, actual);
-    assertTrue(throwable instanceof TimeoutException);
+    assertThat(actual).isEqualTo(initial);
+    assertThat(throwable instanceof TimeoutException).isTrue();
 
     verify(mCountDownLatch, times(1)).await(1, TimeUnit.MILLISECONDS);
     verify(mCountDownLatch, times(0)).countDown();
@@ -130,7 +133,7 @@ public class DataSourcesTest {
 
     // the mocked one falls through, but the real one waits with the countdown latch for isFinished
     final Object actual = DataSources.waitForFinalResult(mDataSource);
-    assertEquals(null, actual);
+    assertThat(actual).isNull();
 
     verify(mCountDownLatch, times(1)).await();
     verify(mCountDownLatch, never()).countDown();
@@ -152,7 +155,7 @@ public class DataSourcesTest {
         .subscribe(any(DataSubscriber.class), any(Executor.class));
 
     final Object actual = DataSources.waitForFinalResult(mDataSource);
-    assertEquals(null, actual);
+    assertThat(actual).isNull();
 
     verify(mCountDownLatch, times(1)).await();
     verify(mCountDownLatch, times(1)).countDown();
@@ -180,7 +183,7 @@ public class DataSourcesTest {
       DataSources.waitForFinalResult(mDataSource);
       fail("expected exception");
     } catch (Exception exception) {
-      assertEquals(expectedException, exception);
+      assertThat(exception).isEqualTo(expectedException);
     }
 
     verify(mCountDownLatch, times(1)).await();

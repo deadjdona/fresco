@@ -7,7 +7,9 @@
 
 package com.facebook.fresco.vito.core.impl
 
+import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import com.facebook.common.references.CloseableReference
 import com.facebook.drawee.backends.pipeline.info.ImageOrigin
 import com.facebook.fresco.ui.common.BaseControllerListener2
 import com.facebook.fresco.ui.common.ControllerListener2
@@ -20,6 +22,7 @@ import com.facebook.fresco.vito.core.ImagePerfLoggingListener
 import com.facebook.fresco.vito.core.VitoImageRequest
 import com.facebook.fresco.vito.core.VitoImageRequestListener
 import com.facebook.fresco.vito.listener.ImageListener
+import com.facebook.imagepipeline.image.CloseableImage
 import com.facebook.imagepipeline.image.ImageInfo
 import java.io.Closeable
 import java.io.IOException
@@ -64,7 +67,8 @@ class CombinedImageListenerImpl : CombinedImageListener {
     val localPerfStatePublisher = imagePerfLoggingListener as? ImagePerfNotifierHolder
     if (localImagePerfStateListener != null && localPerfStatePublisher == null) {
       throw NullPointerException(
-          "trying to set localImagePerfStateListener without a localPerfStatePublisher")
+          "trying to set localImagePerfStateListener without a localPerfStatePublisher"
+      )
     }
     localPerfStatePublisher?.setImagePerfNotifier(localImagePerfStateListener)
   }
@@ -73,7 +77,7 @@ class CombinedImageListenerImpl : CombinedImageListener {
       id: Long,
       imageRequest: VitoImageRequest,
       callerContext: Any?,
-      extras: Extras?
+      extras: Extras?,
   ) {
     vitoImageRequestListener?.onSubmit(id, imageRequest, callerContext, extras)
     localVitoImageRequestListener?.onSubmit(id, imageRequest, callerContext, extras)
@@ -95,12 +99,24 @@ class CombinedImageListenerImpl : CombinedImageListener {
       @ImageOrigin imageOrigin: Int,
       imageInfo: ImageInfo?,
       extras: Extras?,
-      drawable: Drawable?
+      drawable: Drawable?,
   ) {
     vitoImageRequestListener?.onFinalImageSet(
-        id, imageRequest, imageOrigin, imageInfo, extras, drawable)
+        id,
+        imageRequest,
+        imageOrigin,
+        imageInfo,
+        extras,
+        drawable,
+    )
     localVitoImageRequestListener?.onFinalImageSet(
-        id, imageRequest, imageOrigin, imageInfo, extras, drawable)
+        id,
+        imageRequest,
+        imageOrigin,
+        imageInfo,
+        extras,
+        drawable,
+    )
     imageListener?.onFinalImageSet(id, imageOrigin, imageInfo, drawable)
     val stringId = VitoUtils.getStringId(id)
     controllerListener2?.onFinalImageSet(stringId, imageInfo, extras)
@@ -110,7 +126,7 @@ class CombinedImageListenerImpl : CombinedImageListener {
   override fun onIntermediateImageSet(
       id: Long,
       imageRequest: VitoImageRequest,
-      imageInfo: ImageInfo?
+      imageInfo: ImageInfo?,
   ) {
     vitoImageRequestListener?.onIntermediateImageSet(id, imageRequest, imageInfo)
     localVitoImageRequestListener?.onIntermediateImageSet(id, imageRequest, imageInfo)
@@ -123,7 +139,7 @@ class CombinedImageListenerImpl : CombinedImageListener {
   override fun onIntermediateImageFailed(
       id: Long,
       imageRequest: VitoImageRequest,
-      throwable: Throwable?
+      throwable: Throwable?,
   ) {
     vitoImageRequestListener?.onIntermediateImageFailed(id, imageRequest, throwable)
     localVitoImageRequestListener?.onIntermediateImageFailed(id, imageRequest, throwable)
@@ -138,7 +154,7 @@ class CombinedImageListenerImpl : CombinedImageListener {
       imageRequest: VitoImageRequest,
       error: Drawable?,
       throwable: Throwable?,
-      extras: Extras?
+      extras: Extras?,
   ) {
     vitoImageRequestListener?.onFailure(id, imageRequest, error, throwable, extras)
     localVitoImageRequestListener?.onFailure(id, imageRequest, error, throwable, extras)
@@ -186,5 +202,9 @@ class CombinedImageListenerImpl : CombinedImageListener {
         controllerListener2 = null
       }
     } catch (e: IOException) {}
+  }
+
+  override fun onImageSet(image: CloseableReference<CloseableImage>, viewportDimensions: Rect?) {
+    imagePerfLoggingListener?.onImageSet(image, viewportDimensions)
   }
 }

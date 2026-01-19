@@ -7,7 +7,10 @@
 
 package com.facebook.fresco.vito.core.impl
 
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.VisibleForTesting
@@ -18,6 +21,7 @@ import com.facebook.drawee.backends.pipeline.info.ImageOrigin
 import com.facebook.drawee.components.DeferredReleaser
 import com.facebook.drawee.drawable.ScaleTypeDrawable
 import com.facebook.drawee.drawable.ScalingUtils
+import com.facebook.fresco.ui.common.ControllerListener2.Extras
 import com.facebook.fresco.vito.core.CombinedImageListener
 import com.facebook.fresco.vito.core.ImagePerfLoggingListener
 import com.facebook.fresco.vito.core.NopDrawable
@@ -44,6 +48,7 @@ class FrescoDrawable2Impl(
   override var imageRequest: VitoImageRequest? = null
   override var callerContext: Any? = null
   var drawableDataSubscriber: DrawableDataSubscriber? = null
+  var tempFinalImageExtras: Extras? = null
 
   @get:Synchronized @set:Synchronized override var imageId: Long = 0
 
@@ -53,6 +58,8 @@ class FrescoDrawable2Impl(
   override var refetchRunnable: Runnable? = null
   val internalListener: CombinedImageListener = CombinedImageListenerImpl()
   override val imagePerfListener: VitoImagePerfListener
+  override var forceReloadIfImageAlreadySet: Boolean = false
+  override var retriggerListenersIfImageAlreadySet: Boolean = false
 
   init {
     internalListener.setImagePerfLoggingListener(imagePerfLoggingListener)
@@ -70,7 +77,7 @@ class FrescoDrawable2Impl(
         override fun onUltimateProducerReached(
             requestId: String,
             producerName: String,
-            successful: Boolean
+            successful: Boolean,
         ) {
           imageOrigin = mapProducerNameToImageOrigin(producerName)
         }
@@ -113,7 +120,7 @@ class FrescoDrawable2Impl(
 
   fun setImage(
       imageDrawable: Drawable?,
-      imageReference: CloseableReference<CloseableImage>?
+      imageReference: CloseableReference<CloseableImage>?,
   ): Drawable? {
     cancelReleaseNextFrame()
     cancelReleaseDelayed()
@@ -201,19 +208,23 @@ class FrescoDrawable2Impl(
     imageRequest = null
     imageOrigin = ImageOrigin.UNKNOWN
     extras = null
+    forceReloadIfImageAlreadySet = false
+    retriggerListenersIfImageAlreadySet = false
     setOnFadeListener(null)
+    tempFinalImageExtras = null
     internalListener.onReset(
         resetVitoImageRequestListener,
         resetLocalVitoImageRequestListener,
         resetLocalImagePerfStateListener,
-        resetControllerListener2)
+        resetControllerListener2,
+    )
   }
 
-  fun scheduleReleaseDelayed() {
+  fun scheduleReleaseDelayed(releaseDelayMs: Long) {
     if (delayedReleasePending) {
       return
     }
-    handler.postDelayed(releaseRunnable, RELEASE_DELAY)
+    handler.postDelayed(releaseRunnable, releaseDelayMs)
     delayedReleasePending = true
   }
 
@@ -312,12 +323,27 @@ class FrescoDrawable2Impl(
    */
   override fun configureWhenUnderlyingChanged(): Unit = Unit
 
+  override fun hasBitmapWithGainmap(): Boolean =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        maybeGetActualImageBitmap()?.hasGainmap() == true
+      } else {
+        false
+      }
+
   override fun reportVisible(visible: Boolean) {
     getImagePerfLoggingListener()?.reportVisible(visible)
   }
 
+  private fun maybeGetActualImageBitmap(): Bitmap? {
+    val drawable = actualImageDrawable
+    return if (drawable is BitmapDrawable) {
+      drawable.bitmap
+    } else {
+      null
+    }
+  }
+
   companion object {
-    private const val RELEASE_DELAY: Long = 16 * 5L // Roughly 5 frames.
     private val handler = Handler(Looper.getMainLooper())
     private val deferredReleaser = DeferredReleaser.getInstance()
   }

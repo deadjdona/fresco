@@ -86,12 +86,12 @@ class FrescoVitoLithoImageOptionsConfigFragment : BaseShowcaseFragment() {
 
   private var componentContext: ComponentContext? = null
   private var lithoView: LithoView? = null
-  private var useTapToRetry = false
+  private val useTapToRetry = false
 
   override fun onCreateView(
       inflater: LayoutInflater,
       container: ViewGroup?,
-      savedInstanceState: Bundle?
+      savedInstanceState: Bundle?,
   ): View {
     _binding = FragmentVitoImageOptionsConfigBinding.inflate(inflater, container, false)
     return binding.root
@@ -114,12 +114,12 @@ class FrescoVitoLithoImageOptionsConfigFragment : BaseShowcaseFragment() {
     spinnerScaleType.setupWithList(VitoSpinners.scaleTypes) {
       refresh(imageOptionsBuilder.scale(it.first).focusPoint(it.second))
     }
-    spinnerImageSource.setupWithList(imageSourceProvider.imageSources) {
-      it()
+    spinnerImageSource.setupWithList(imageSourceProvider.imageSources) { imageSourceSetter ->
+      imageSourceSetter()
       refresh()
     }
-    spinnerImageFormat.setupWithList(imageSourceProvider.imageFormatUpdater) {
-      it()
+    spinnerImageFormat.setupWithList(imageSourceProvider.imageFormatUpdater) { formatUpdater ->
+      formatUpdater()
       refresh()
     }
     spinnerColorFilter.setupWithList(VitoSpinners.colorFilters) {

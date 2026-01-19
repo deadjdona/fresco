@@ -61,7 +61,7 @@ readStreamFully(JNIEnv* env, jobject is, jbyteArray inTempStorage) {
       return read_buffer;
     }
 
-    if (chunk_size > 0) {
+    if (chunk_size > 0 && chunk_size < env->GetArrayLength(inTempStorage)) {
       jbyte* data = env->GetByteArrayElements(inTempStorage, nullptr);
       RETURN_NULL_IF_EXCEPTION(env);
 
@@ -218,7 +218,8 @@ jobject nativeDecodeByteArray(
     env->ReleaseByteArrayElements(inTempStorage, data, JNI_ABORT);
     RETURN_NULL_IF_EXCEPTION(env);
   }
-  if (data == nullptr || offset + length > env->GetArrayLength(array)) {
+  if (data == nullptr || 0 > offset ||
+      offset + length > env->GetArrayLength(array)) {
     env->ReleaseByteArrayElements(array, data, JNI_ABORT);
     RETURN_NULL_IF_EXCEPTION(env);
   }

@@ -23,7 +23,7 @@ class DiskCachesStoreFactory(
     @MemoryChunkType private val memoryChunkType: Int,
     private val mainDiskCacheConfig: DiskCacheConfig,
     private val smallImageDiskCacheConfig: DiskCacheConfig,
-    private val dynamicDiskCacheConfigMap: Map<String, DiskCacheConfig>?
+    private val dynamicDiskCacheConfigMap: Map<String, DiskCacheConfig>?,
 ) : Supplier<DiskCachesStore> {
 
   constructor(
@@ -37,7 +37,8 @@ class DiskCachesStoreFactory(
       memoryChunkType = config.memoryChunkType,
       mainDiskCacheConfig = config.mainDiskCacheConfig,
       smallImageDiskCacheConfig = config.smallImageDiskCacheConfig,
-      dynamicDiskCacheConfigMap = config.dynamicDiskCacheConfigMap)
+      dynamicDiskCacheConfigMap = config.dynamicDiskCacheConfigMap,
+  )
 
   private val diskCachesStore: DiskCachesStore by
       lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -54,7 +55,11 @@ class DiskCachesStoreFactory(
                     poolFactory.pooledByteStreams,
                     executorSupplier.forLocalStorageRead(),
                     executorSupplier.forLocalStorageWrite(),
-                    imageCacheStatsTracker)
+                    imageCacheStatsTracker,
+                    false,
+                    false,
+                    null,
+                )
               }
 
           override val smallImageFileCache: FileCache by
@@ -70,7 +75,11 @@ class DiskCachesStoreFactory(
                     poolFactory.pooledByteStreams,
                     executorSupplier.forLocalStorageRead(),
                     executorSupplier.forLocalStorageWrite(),
-                    imageCacheStatsTracker)
+                    imageCacheStatsTracker,
+                    false,
+                    false,
+                    null,
+                )
               }
 
           override val dynamicFileCaches: Map<String, FileCache> by
@@ -90,8 +99,13 @@ class DiskCachesStoreFactory(
                           poolFactory.pooledByteStreams,
                           executorSupplier.forLocalStorageRead(),
                           executorSupplier.forLocalStorageWrite(),
-                          imageCacheStatsTracker)
-                    })
+                          imageCacheStatsTracker,
+                          false,
+                          false,
+                          null,
+                      )
+                    }
+                )
               }
         }
       }

@@ -19,7 +19,7 @@ data class ImageRequestImageSource(private val imageRequest: ImageRequest) :
     ImagePipelineImageSource {
   override fun maybeExtractFinalImageRequest(
       imagePipelineUtils: ImagePipelineUtils,
-      imageOptions: ImageOptions
+      imageOptions: ImageOptions,
   ): ImageRequest? {
     return imagePipelineUtils.wrapDecodedImageRequest(imageRequest, imageOptions)
   }
@@ -29,4 +29,6 @@ data class ImageRequestImageSource(private val imageRequest: ImageRequest) :
   override val extras: Map<String, Any> = emptyMap()
 
   override fun getRequestLevelForFetch(): RequestLevel = RequestLevel.FULL_FETCH
+
+  override fun getClassNameString(): String = "ImageRequestImageSource"
 }

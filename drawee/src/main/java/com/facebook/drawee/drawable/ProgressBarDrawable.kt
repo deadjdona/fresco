@@ -17,7 +17,7 @@ import android.graphics.drawable.Drawable
 import kotlin.math.min
 
 /** Drawable that displays a progress bar based on the level. */
-class ProgressBarDrawable : Drawable(), CloneableDrawable {
+open class ProgressBarDrawable : Drawable(), CloneableDrawable {
 
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
   private val path = Path()
@@ -177,7 +177,8 @@ class ProgressBarDrawable : Drawable(), CloneableDrawable {
         rect,
         min(_radius.toDouble(), (_barWidth / 2).toDouble()).toFloat(),
         min(_radius.toDouble(), (_barWidth / 2).toDouble()).toFloat(),
-        Path.Direction.CW)
+        Path.Direction.CW,
+    )
     canvas.drawPath(path, paint)
   }
 }

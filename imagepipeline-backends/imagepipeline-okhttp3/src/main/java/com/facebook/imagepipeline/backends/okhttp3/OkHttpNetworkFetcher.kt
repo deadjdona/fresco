@@ -7,7 +7,6 @@
 
 package com.facebook.imagepipeline.backends.okhttp3
 
-import android.os.Build
 import android.os.Looper
 import android.os.SystemClock
 import com.facebook.imagepipeline.backends.okhttp3.OkHttpNetworkFetcher.OkHttpNetworkFetchState
@@ -45,7 +44,7 @@ open class OkHttpNetworkFetcher
 constructor(
     private val callFactory: Call.Factory,
     private val cancellationExecutor: Executor,
-    disableOkHttpCache: Boolean = true
+    disableOkHttpCache: Boolean = true,
 ) : BaseNetworkFetcher<OkHttpNetworkFetchState>() {
 
   /** @param okHttpClient client to use */
@@ -55,7 +54,7 @@ constructor(
 
   class OkHttpNetworkFetchState(
       consumer: Consumer<EncodedImage?>,
-      producerContext: ProducerContext
+      producerContext: ProducerContext,
   ) : FetchState(consumer, producerContext) {
     @JvmField var submitTime: Long = 0
     @JvmField var responseTime: Long = 0
@@ -67,7 +66,7 @@ constructor(
 
   override fun createFetchState(
       consumer: Consumer<EncodedImage?>,
-      context: ProducerContext
+      context: ProducerContext,
   ): OkHttpNetworkFetchState = OkHttpNetworkFetchState(consumer, context)
 
   override fun fetch(fetchState: OkHttpNetworkFetchState, callback: NetworkFetcher.Callback) {
@@ -93,18 +92,19 @@ constructor(
 
   override fun getExtraMap(
       fetchState: OkHttpNetworkFetchState,
-      byteSize: Int
+      byteSize: Int,
   ): Map<String, String>? =
       mapOf(
           QUEUE_TIME to (fetchState.responseTime - fetchState.submitTime).toString(),
           FETCH_TIME to (fetchState.fetchCompleteTime - fetchState.responseTime).toString(),
           TOTAL_TIME to (fetchState.fetchCompleteTime - fetchState.submitTime).toString(),
-          IMAGE_SIZE to byteSize.toString())
+          IMAGE_SIZE to byteSize.toString(),
+      )
 
   protected open fun fetchWithRequest(
       fetchState: OkHttpNetworkFetchState,
       callback: NetworkFetcher.Callback,
-      request: Request
+      request: Request,
   ) {
     val call = callFactory.newCall(request)
     fetchState.context.addCallbacks(
@@ -116,7 +116,8 @@ constructor(
               cancellationExecutor.execute { call.cancel() }
             }
           }
-        })
+        }
+    )
     call.enqueue(
         object : Callback {
           @Throws(IOException::class)
@@ -129,13 +130,16 @@ constructor(
                   handleException(
                       call,
                       makeExceptionFromResponse("Unexpected HTTP code $response", response),
-                      callback)
+                      callback,
+                  )
                   return@use
                 }
                 val responseRange = fromContentRangeHeader(response.header("Content-Range"))
-                if (responseRange != null &&
-                    !(responseRange.from == 0 &&
-                        responseRange.to == BytesRange.TO_END_OF_CONTENT)) {
+                if (
+                    responseRange != null &&
+                        !(responseRange.from == 0 &&
+                            responseRange.to == BytesRange.TO_END_OF_CONTENT)
+                ) {
                   // Only treat as a partial image if the range is not all of the content
                   fetchState.responseBytesRange = responseRange
                   fetchState.onNewResultStatusFlags = Consumer.IS_PARTIAL_RESULT
@@ -151,19 +155,17 @@ constructor(
                 ?: handleException(
                     call,
                     makeExceptionFromResponse("Response body null: $response", response),
-                    callback)
+                    callback,
+                )
           }
 
           override fun onFailure(call: Call, e: IOException) = handleException(call, e, callback)
-        })
+        }
+    )
   }
 
   private fun makeExceptionFromResponse(message: String, response: Response): IOException =
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.GINGERBREAD) {
-        IOException(message, OkHttpNetworkFetcherException.fromResponse(response))
-      } else {
-        IOException(message)
-      }
+      IOException(message, OkHttpNetworkFetcherException.fromResponse(response))
 
   /**
    * Handles exceptions.

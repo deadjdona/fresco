@@ -30,8 +30,10 @@ interface ControllerListener2<INFO> {
     @JvmField var logWithHighSamplingRate: Boolean = false
     @JvmField var smartUrlFetchStrategy: Any? = null
     @JvmField var smartUrlModificationResult: Any? = null
-    @JvmField var originalUri: Uri? = null
+    @JvmField var smartOriginalUri: Uri? = null
     @JvmField var uiFramework: String? = null
+    @JvmField var imageSource: Any? = null
+    @JvmField var sizingHint: Any? = null
 
     fun makeExtrasCopy(): Extras {
       val extras = Extras()
@@ -47,6 +49,8 @@ interface ControllerListener2<INFO> {
       extras.focusX = focusX
       extras.focusY = focusY
       extras.uiFramework = uiFramework
+      extras.imageSource = imageSource
+      extras.sizingHint = sizingHint
       return extras
     }
 

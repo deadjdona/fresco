@@ -25,10 +25,10 @@ class OrientedDrawable
 constructor(
     drawable: Drawable?,
     rotationAngle: Int,
-    exifOrientation: Int = ExifInterface.ORIENTATION_UNDEFINED
+    exifOrientation: Int = ExifInterface.ORIENTATION_UNDEFINED,
 ) : ForwardingDrawable(drawable) {
 
-  @JvmField @VisibleForTesting val mRotationMatrix: Matrix = Matrix()
+  @JvmField @VisibleForTesting val rotationMatrix: Matrix = Matrix()
   private val rotationAngle = rotationAngle - rotationAngle % 90
   private val exifOrientation =
       if (exifOrientation >= 0 && exifOrientation <= 8) exifOrientation
@@ -45,31 +45,37 @@ constructor(
    * @param exifOrientation EXIF values (1-8), or 0 if unknown. Invalid value is replaced with 0.
    */
   override fun draw(canvas: Canvas) {
-    if (rotationAngle <= 0 &&
-        (exifOrientation == ExifInterface.ORIENTATION_UNDEFINED ||
-            exifOrientation == ExifInterface.ORIENTATION_NORMAL)) {
+    if (
+        rotationAngle <= 0 &&
+            (exifOrientation == ExifInterface.ORIENTATION_UNDEFINED ||
+                exifOrientation == ExifInterface.ORIENTATION_NORMAL)
+    ) {
       super.draw(canvas)
       return
     }
     val saveCount = canvas.save()
-    canvas.concat(mRotationMatrix)
+    canvas.concat(rotationMatrix)
     super.draw(canvas)
     canvas.restoreToCount(saveCount)
   }
 
   override fun getIntrinsicWidth(): Int =
-      if (exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
-          exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE ||
-          rotationAngle % 180 != 0) {
+      if (
+          exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+              exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE ||
+              rotationAngle % 180 != 0
+      ) {
         super.getIntrinsicHeight()
       } else {
         super.getIntrinsicWidth()
       }
 
   override fun getIntrinsicHeight(): Int =
-      if (exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
-          exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE ||
-          rotationAngle % 180 != 0) {
+      if (
+          exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+              exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE ||
+              rotationAngle % 180 != 0
+      ) {
         super.getIntrinsicWidth()
       } else {
         super.getIntrinsicHeight()
@@ -78,37 +84,43 @@ constructor(
   override fun onBoundsChange(bounds: Rect) {
     val underlyingDrawable = current ?: return
 
-    if (rotationAngle > 0 ||
-        (exifOrientation != ExifInterface.ORIENTATION_UNDEFINED &&
-            exifOrientation != ExifInterface.ORIENTATION_NORMAL)) {
+    if (
+        rotationAngle > 0 ||
+            (exifOrientation != ExifInterface.ORIENTATION_UNDEFINED &&
+                exifOrientation != ExifInterface.ORIENTATION_NORMAL)
+    ) {
       when (exifOrientation) {
-        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> mRotationMatrix.setScale(-1f, 1f)
-        ExifInterface.ORIENTATION_FLIP_VERTICAL -> mRotationMatrix.setScale(1f, -1f)
+        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> rotationMatrix.setScale(-1f, 1f)
+        ExifInterface.ORIENTATION_FLIP_VERTICAL -> rotationMatrix.setScale(1f, -1f)
         ExifInterface.ORIENTATION_TRANSPOSE -> {
-          mRotationMatrix.setRotate(270f, bounds.centerX().toFloat(), bounds.centerY().toFloat())
-          mRotationMatrix.postScale(1f, -1f)
+          rotationMatrix.setRotate(270f, bounds.centerX().toFloat(), bounds.centerY().toFloat())
+          rotationMatrix.postScale(1f, -1f)
         }
 
         ExifInterface.ORIENTATION_TRANSVERSE -> {
-          mRotationMatrix.setRotate(270f, bounds.centerX().toFloat(), bounds.centerY().toFloat())
-          mRotationMatrix.postScale(-1f, 1f)
+          rotationMatrix.setRotate(270f, bounds.centerX().toFloat(), bounds.centerY().toFloat())
+          rotationMatrix.postScale(-1f, 1f)
         }
 
         else ->
-            mRotationMatrix.setRotate(
-                rotationAngle.toFloat(), bounds.centerX().toFloat(), bounds.centerY().toFloat())
+            rotationMatrix.setRotate(
+                rotationAngle.toFloat(),
+                bounds.centerX().toFloat(),
+                bounds.centerY().toFloat(),
+            )
       }
 
       // Set the rotated bounds on the underlying drawable
       tempMatrix.reset()
-      mRotationMatrix.invert(tempMatrix)
+      rotationMatrix.invert(tempMatrix)
       tempRectF.set(bounds)
       tempMatrix.mapRect(tempRectF)
       underlyingDrawable.setBounds(
           tempRectF.left.toInt(),
           tempRectF.top.toInt(),
           tempRectF.right.toInt(),
-          tempRectF.bottom.toInt())
+          tempRectF.bottom.toInt(),
+      )
     } else {
       underlyingDrawable.bounds = bounds
     }
@@ -116,8 +128,8 @@ constructor(
 
   override fun getTransform(transform: Matrix) {
     getParentTransform(transform)
-    if (!mRotationMatrix.isIdentity) {
-      transform.preConcat(mRotationMatrix)
+    if (!rotationMatrix.isIdentity) {
+      transform.preConcat(rotationMatrix)
     }
   }
 }

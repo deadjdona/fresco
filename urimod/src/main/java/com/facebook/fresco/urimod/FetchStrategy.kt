@@ -13,8 +13,10 @@ data object NoPrefetchInOnPrepareStrategy : FetchStrategy
 
 enum class SmartFetchStrategy : FetchStrategy {
   DEFAULT,
+  FALLBACK_DISABLED,
   MAIN_THREAD,
   DISK_CACHE_TIMEOUT,
+  VARIATION,
   ;
 
   override fun toString(): String = "SmartFetchStrategy: ${this.name}"
@@ -28,6 +30,7 @@ enum class ClassicFetchStrategy : FetchStrategy {
   MAIN_THREAD,
   DISK_CACHE_TIMEOUT,
   DISK_CACHE_HIT,
+  URI_INELIGIBLE,
   ;
 
   override fun toString(): String = "ClassicFetchStrategy: ${this.name}"

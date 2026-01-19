@@ -15,6 +15,7 @@ import com.facebook.common.memory.PooledByteBuffer
 import com.facebook.common.memory.PooledByteBufferFactory
 import com.facebook.common.memory.PooledByteStreams
 import com.facebook.common.references.CloseableReference
+import com.facebook.fresco.middleware.HasExtraData
 import com.facebook.imagepipeline.image.EncodedImage
 import com.facebook.imagepipeline.instrumentation.FrescoInstrumenter
 import com.facebook.imagepipeline.systrace.FrescoSystrace.traceSection
@@ -34,7 +35,10 @@ class BufferedDiskCache(
     private val pooledByteStreams: PooledByteStreams,
     private val readExecutor: Executor,
     private val writeExecutor: Executor,
-    private val imageCacheStatsTracker: ImageCacheStatsTracker
+    private val imageCacheStatsTracker: ImageCacheStatsTracker,
+    private val preserveMetadata: Boolean,
+    private val preserveMetadataDuringStartup: Boolean,
+    private val isAppStarting: (() -> Boolean)?,
 ) {
 
   private val stagingArea: StagingArea = StagingArea.getInstance()
@@ -80,7 +84,8 @@ class BufferedDiskCache(
               FrescoInstrumenter.onEndWork(currentToken)
             }
           },
-          readExecutor)
+          readExecutor,
+      )
     } catch (exception: Exception) {
       // Log failure
       // TODO: 3697790
@@ -137,7 +142,8 @@ class BufferedDiskCache(
             }
             null
           },
-          writeExecutor)
+          writeExecutor,
+      )
     } catch (exception: Exception) {
       FLog.w(TAG, exception, "Failed to schedule disk-cache probe for %s", key.uriString)
       Task.forError(exception)
@@ -195,7 +201,9 @@ class BufferedDiskCache(
                       val buffer = readFromDiskCache(key) ?: return@Callable null
                       val ref = CloseableReference.of(buffer)
                       try {
-                        EncodedImage(ref)
+                        val image = EncodedImage(ref)
+                        maybeRestoreMetadata(key, image)
+                        image
                       } finally {
                         CloseableReference.closeSafely(ref)
                       }
@@ -205,7 +213,7 @@ class BufferedDiskCache(
               }
               if (Thread.interrupted()) {
                 FLog.v(TAG, "Host thread was interrupted, decreasing reference count")
-                result?.close()
+                result.close()
                 throw InterruptedException()
               } else {
                 return@Callable result
@@ -217,7 +225,8 @@ class BufferedDiskCache(
               FrescoInstrumenter.onEndWork(currentToken)
             }
           },
-          readExecutor)
+          readExecutor,
+      )
     } catch (exception: Exception) {
       // Log failure
       // TODO: 3697790
@@ -284,7 +293,8 @@ class BufferedDiskCache(
             }
             null
           },
-          writeExecutor)
+          writeExecutor,
+      )
     } catch (exception: Exception) {
       // Log failure
       // TODO: 3697790
@@ -312,7 +322,8 @@ class BufferedDiskCache(
               FrescoInstrumenter.onEndWork(currentToken)
             }
           },
-          writeExecutor)
+          writeExecutor,
+      )
     } catch (exception: Exception) {
       // Log failure
       // TODO: 3697790
@@ -322,7 +333,7 @@ class BufferedDiskCache(
   }
 
   val size: Long
-    get() = fileCache.size
+    get() = fileCache.getSize()
 
   private fun foundPinnedImage(key: CacheKey, pinnedImage: EncodedImage): Task<EncodedImage> {
     FLog.v(TAG, "Found image for %s in staging area", key.uriString)
@@ -374,7 +385,8 @@ class BufferedDiskCache(
       fileCache.insert(key) { os ->
         val inputStream = encodedImage!!.inputStream
         checkNotNull(inputStream)
-        pooledByteStreams.copy(inputStream!!, os)
+        pooledByteStreams.copy(inputStream, os)
+        maybeSaveMetadata(key, encodedImage)
       }
       imageCacheStatsTracker.onDiskCachePut(key)
       FLog.v(TAG, "Successful disk-cache write for key %s", key.uriString)
@@ -382,6 +394,24 @@ class BufferedDiskCache(
       // Log failure
       // TODO: 3697790
       FLog.w(TAG, ioe, "Failed to write to disk-cache for key %s", key.uriString)
+    }
+  }
+
+  private fun maybeSaveMetadata(key: CacheKey, image: EncodedImage) {
+    if (!preserveMetadataDuringStartup && isAppStarting?.invoke() == true) {
+      return
+    }
+    if (preserveMetadata) {
+      image.getExtra<String>(HasExtraData.KEY_SF_QUERY)?.let { fileCache.setMetadata(key, it) }
+    }
+  }
+
+  private fun maybeRestoreMetadata(key: CacheKey, image: EncodedImage) {
+    if (!preserveMetadataDuringStartup && isAppStarting?.invoke() == true) {
+      return
+    }
+    if (preserveMetadata) {
+      fileCache.getMetadata(key)?.let { data -> image.putExtra(HasExtraData.KEY_SF_QUERY, data) }
     }
   }
 

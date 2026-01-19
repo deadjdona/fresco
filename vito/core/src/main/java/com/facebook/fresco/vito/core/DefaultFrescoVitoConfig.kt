@@ -7,9 +7,11 @@
 
 package com.facebook.fresco.vito.core
 
+import android.net.Uri
 import com.facebook.common.callercontext.ContextChain
 import com.facebook.common.internal.Supplier
 import com.facebook.common.internal.Suppliers
+import kotlin.Long
 
 open class DefaultFrescoVitoConfig
 @JvmOverloads
@@ -17,6 +19,24 @@ constructor(override val prefetchConfig: PrefetchConfig = DefaultPrefetchConfig(
     FrescoVitoConfig {
 
   override fun submitFetchOnBgThread(): Boolean = true
+
+  override fun useBind(): Boolean = true
+
+  override fun useMount(): Boolean = true
+
+  override fun useUnbind(): Boolean = true
+
+  override fun useDetached(): Boolean = false
+
+  override fun onUnbindReleaseStrategy(): ReleaseStrategy = ReleaseStrategy.DELAYED
+
+  override fun onUnmountReleaseStrategy(): ReleaseStrategy = ReleaseStrategy.NEXT_FRAME
+
+  override fun onDetachedReleaseStrategy(): ReleaseStrategy = ReleaseStrategy.NEXT_FRAME
+
+  override fun releaseDelayMs(): Long = 16 * 5L // Roughly 5 frames.
+
+  override fun useUnmount(): Boolean = true
 
   override fun useBindOnly(): Boolean = false
 
@@ -58,10 +78,17 @@ constructor(override val prefetchConfig: PrefetchConfig = DefaultPrefetchConfig(
 
   override fun experimentalDynamicSizeIsProductEnabled(
       callerContext: Any?,
-      contextChain: ContextChain?
+      contextChain: ContextChain?,
+  ): Boolean = true
+
+  override fun experimentalDynamicSizeIsFallbackEnabled(
+      callerContext: Any?,
+      contextChain: ContextChain?,
   ): Boolean = true
 
   override fun experimentalDynamicSizeBloksDisableDiskCacheCheck(): Boolean = false
+
+  override fun experimentalDynamicSizeIsUriEligible(uri: Uri?): Boolean = true
 
   override fun experimentalResetVitoImageRequestListener() = false
 
@@ -73,6 +100,10 @@ constructor(override val prefetchConfig: PrefetchConfig = DefaultPrefetchConfig(
 
   override fun isCallerContextBloks(callerContext: Any?): Boolean = false
 
+  override fun enablePrepareToDrawOnFetch(): Boolean = false
+
+  override fun experimentalOptimizeAlphaHandling(): Boolean = false
+
   open class DefaultPrefetchConfig : PrefetchConfig {
     override fun prefetchInOnPrepare(): Boolean = true
 
@@ -81,5 +112,13 @@ constructor(override val prefetchConfig: PrefetchConfig = DefaultPrefetchConfig(
     override fun prefetchTargetOnPrepare(): PrefetchTarget = PrefetchTarget.MEMORY_DECODED
 
     override fun prefetchTargetOnBoundsDefined(): PrefetchTarget = PrefetchTarget.MEMORY_DECODED
+
+    override fun closePrefetchDataSourceOnBindorOnMount(): Boolean = true
+
+    override fun closePrefetchDataSourceOnUnbind(): Boolean = true
+
+    override fun closePrefetchDataSourceOnUnmount(): Boolean = true
+
+    override fun closePrefetchDataSourceOnDetached(): Boolean = false
   }
 }

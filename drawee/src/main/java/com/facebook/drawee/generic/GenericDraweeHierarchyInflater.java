@@ -211,9 +211,8 @@ public class GenericDraweeHierarchyInflater {
       } finally {
         gdhAttrs.recycle();
 
-        if (android.os.Build.VERSION.SDK_INT >= 17
-            && context.getResources().getConfiguration().getLayoutDirection()
-                == View.LAYOUT_DIRECTION_RTL) {
+        if (context.getResources().getConfiguration().getLayoutDirection()
+            == View.LAYOUT_DIRECTION_RTL) {
           roundTopLeft = roundTopLeft && roundTopEnd;
           roundTopRight = roundTopRight && roundTopStart;
           roundBottomRight = roundBottomRight && roundBottomStart;
@@ -260,11 +259,7 @@ public class GenericDraweeHierarchyInflater {
     if (resourceId == 0) {
       return null;
     }
-    if (android.os.Build.VERSION.SDK_INT >= 21) {
-      return context.getDrawable(resourceId);
-    } else {
-      return context.getResources().getDrawable(resourceId);
-    }
+    return context.getDrawable(resourceId);
   }
 
   /**

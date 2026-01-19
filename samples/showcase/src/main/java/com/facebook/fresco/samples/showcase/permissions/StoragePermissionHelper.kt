@@ -26,10 +26,15 @@ object StoragePermissionHelper {
    * permissions were requested, false otherwise
    */
   fun withStoragePermission(activity: Activity, action: (Unit) -> Unit = {}) {
-    if (ContextCompat.checkSelfPermission(activity, READ_EXTERNAL_STORAGE) !=
-        PackageManager.PERMISSION_GRANTED) {
+    if (
+        ContextCompat.checkSelfPermission(activity, READ_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+    ) {
       ActivityCompat.requestPermissions(
-          activity, arrayOf(READ_EXTERNAL_STORAGE), PERMISSION_REQUEST_CODE)
+          activity,
+          arrayOf(READ_EXTERNAL_STORAGE),
+          PERMISSION_REQUEST_CODE,
+      )
       pendingAction = action
     } else {
       action(Unit)
@@ -44,7 +49,7 @@ object StoragePermissionHelper {
       context: Context,
       requestCode: Int,
       permissions: Array<out String>,
-      grantResults: IntArray
+      grantResults: IntArray,
   ) {
     if (requestCode != PERMISSION_REQUEST_CODE) {
       return
@@ -61,7 +66,8 @@ object StoragePermissionHelper {
         Toast.makeText(
                 context,
                 "This sample app needs storage permissions to load images",
-                Toast.LENGTH_LONG)
+                Toast.LENGTH_LONG,
+            )
             .show()
       }
       return

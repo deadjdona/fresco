@@ -14,12 +14,15 @@ import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.util.TypedValue
+import com.facebook.common.logging.FLog
 import com.facebook.drawee.drawable.ScalingUtils
 import com.facebook.fresco.vito.options.ImageOptions
 import com.facebook.fresco.vito.renderer.CanvasTransformation
 import com.facebook.fresco.vito.renderer.ColorIntImageDataModel
 import com.facebook.fresco.vito.renderer.DrawableImageDataModel
 import com.facebook.fresco.vito.renderer.ImageDataModel
+
+private const val TAG = "KImageOptions"
 
 // Models
 fun ImageOptions.createPlaceholderModel(resources: Resources): ImageDataModel? =
@@ -30,6 +33,9 @@ fun ImageOptions.createOverlayModel(resources: Resources): ImageDataModel? =
 
 fun ImageOptions.createErrorModel(resources: Resources): ImageDataModel? =
     toModel(resources, errorDrawable, errorRes, errorColor)
+
+fun ImageOptions.createBackgroundModel(resources: Resources): ImageDataModel? =
+    toModel(backgroundDrawable)
 
 // Drawables
 fun ImageOptions.createProgressDrawable(resources: Resources): Drawable? =
@@ -52,7 +58,7 @@ fun ImageOptions.createErrorCanvasTransformation(): CanvasTransformation? =
     errorScaleType?.getCanvasTransformation(errorFocusPoint)
 
 private fun create(resources: Resources, drawable: Drawable?, drawableRes: Int): Drawable? {
-  return drawable ?: if (drawableRes != 0) resources.getDrawable(drawableRes) else null
+  return drawable ?: if (drawableRes != 0) resources.getNullableDrawable(drawableRes) else null
 }
 
 private fun toModel(drawable: Drawable?): ImageDataModel? {
@@ -68,7 +74,7 @@ private fun toModel(
     resources: Resources,
     drawable: Drawable?,
     colorOrDrawableRes: Int,
-    colorInt: Int?
+    colorInt: Int?,
 ): ImageDataModel? =
     when {
       drawable != null -> toModel(drawable)
@@ -82,15 +88,26 @@ private fun Resources.getColorOrDrawableModel(colorOrDrawableRes: Int): ImageDat
       val value = TypedValue()
       getValue(colorOrDrawableRes, value, true)
 
-      if (value.type >= TypedValue.TYPE_FIRST_COLOR_INT &&
-          value.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+      if (
+          value.type >= TypedValue.TYPE_FIRST_COLOR_INT &&
+              value.type <= TypedValue.TYPE_LAST_COLOR_INT
+      ) {
         ColorIntImageDataModel(value.data)
       } else {
-        toModel(getDrawable(colorOrDrawableRes))
+        toModel(getNullableDrawable(colorOrDrawableRes))
       }
     } else {
       null
     }
+
+private fun Resources.getNullableDrawable(drawableRes: Int): Drawable? {
+  try {
+    return getDrawable(drawableRes)
+  } catch (e: Resources.NotFoundException) {
+    FLog.e(TAG, "Drawable not found in Resources $drawableRes", e)
+    return null
+  }
+}
 
 fun ScalingUtils.ScaleType.getCanvasTransformation(
     focusPoint: PointF? = null
@@ -100,7 +117,7 @@ fun ScalingUtils.ScaleType.getCanvasTransformation(
           outTransform: Matrix,
           parentBounds: Rect,
           childWidth: Int,
-          childHeight: Int
+          childHeight: Int,
       ): Matrix {
         getTransform(
             outTransform,
@@ -108,7 +125,8 @@ fun ScalingUtils.ScaleType.getCanvasTransformation(
             childWidth,
             childHeight,
             focusPoint?.x ?: 0.5f,
-            focusPoint?.y ?: 0.5f)
+            focusPoint?.y ?: 0.5f,
+        )
         return outTransform
       }
     }

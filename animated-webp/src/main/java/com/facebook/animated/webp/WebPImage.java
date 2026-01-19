@@ -52,6 +52,7 @@ public class WebPImage implements AnimatedImage, AnimatedImageDecoder {
     mNativeContext = nativeContext;
   }
 
+  // This is a valid use of finalize. No other mechanism is appropriate.
   @Override
   protected void finalize() {
     nativeFinalize();
@@ -70,7 +71,7 @@ public class WebPImage implements AnimatedImage, AnimatedImageDecoder {
    */
   public static WebPImage createFromByteArray(byte[] source, @Nullable ImageDecodeOptions options) {
     ensure();
-    Preconditions.checkNotNull(source);
+    Preconditions.checkNotNull(source, "Source byte array cannot be null");
 
     ByteBuffer byteBuffer = ByteBuffer.allocateDirect(source.length);
     byteBuffer.put(source);

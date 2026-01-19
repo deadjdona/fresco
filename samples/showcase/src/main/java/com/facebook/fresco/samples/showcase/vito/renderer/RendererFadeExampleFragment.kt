@@ -55,7 +55,9 @@ class RendererFadeExampleFragment : BaseShowcaseKotlinFragment() {
           it.configure(
               dataModel =
                   DrawableImageDataModel(
-                      ContextCompat.getDrawable(requireContext(), R.drawable.logo)!!))
+                      ContextCompat.getDrawable(requireContext(), R.drawable.logo)!!
+                  )
+          )
         }
 
     val colorImageDataModel =
@@ -63,11 +65,26 @@ class RendererFadeExampleFragment : BaseShowcaseKotlinFragment() {
 
     container.findViewById<LinearLayout>(R.id.list).apply {
       addFadingExampleWithImageData(
-          this, bitmapImageDataModel, "Bitmap: Click to Fade In&Out Bitmap", w, h)
+          this,
+          bitmapImageDataModel,
+          "Bitmap: Click to Fade In&Out Bitmap",
+          w,
+          h,
+      )
       addFadingExampleWithImageData(
-          this, drawableImageDataModel, "Drawable: Click to Fade In&Out Bitmap", w, h)
+          this,
+          drawableImageDataModel,
+          "Drawable: Click to Fade In&Out Bitmap",
+          w,
+          h,
+      )
       addFadingExampleWithImageData(
-          this, colorImageDataModel, "Color: Click to Fade In&Out Bitmap", w, h)
+          this,
+          colorImageDataModel,
+          "Color: Click to Fade In&Out Bitmap",
+          w,
+          h,
+      )
     }
   }
 
@@ -76,7 +93,7 @@ class RendererFadeExampleFragment : BaseShowcaseKotlinFragment() {
       imageDataModel: ImageLayerDataModel,
       title: String,
       w: Int,
-      h: Int
+      h: Int,
   ) {
     linearLayout
         .addImageViewWithText(title, w, h) {

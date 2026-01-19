@@ -97,15 +97,10 @@ dependencies {
     soLoaderImplementation project(':drawee-backends:drawee-pipeline')
 
     testImplementation TestDeps.junit
+    testImplementation TestDeps.assertjCore
 
     androidTestImplementation TestDeps.junit
     androidTestImplementation TestDeps.mockitoCore
-    androidTestImplementation(TestDeps.Powermock.apiMockito) {
-        exclude group: 'org.mockito', module: 'mockito-all'
-    }
-    androidTestImplementation TestDeps.Powermock.moduleJunit4
-    androidTestImplementation TestDeps.Powermock.moduleJunit4Rule
-    androidTestImplementation TestDeps.Powermock.classloadingXstream
     androidTestImplementation(TestDeps.robolectric) {
         exclude group: 'commons-logging', module: 'commons-logging'
         exclude group: 'org.apache.httpcomponents', module: 'httpclient'

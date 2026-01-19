@@ -32,12 +32,16 @@ class KFrescoVitoDrawable(
     private val resetLocalVitoImageRequestListener: Boolean = false,
     private val resetLocalImagePerfStateListener: Boolean = false,
     private val resetControllerListener2: Boolean = false,
+    private val optimizeAlphaHandling: Boolean = false,
 ) : Drawable(), FrescoDrawableInterface, Drawable.Callback {
 
   var _imageId: Long = 0
   var _isLoading: Boolean = false
   override var callerContext: Any? = null
   override var uiFramework: String? = null
+  override var forceReloadIfImageAlreadySet: Boolean = false
+  override var retriggerListenersIfImageAlreadySet: Boolean = false
+
   var _visibilityCallback: VisibilityCallback? = null
   var _fetchSubmitted: Boolean = false
   val listenerManager: CombinedImageListener = CombinedImageListenerImpl()
@@ -53,10 +57,10 @@ class KFrescoVitoDrawable(
   var _intrinsicWidth: Int = -1
   var _intrinsicHeight: Int = -1
 
-  private val closeableCleanupFunction: (Closeable) -> Unit = {
+  private val closeableCleanupFunction: (Closeable) -> Unit = { closeableResource ->
     ImageReleaseScheduler.cancelAllReleasing(this)
     try {
-      it.close()
+      closeableResource.close()
     } catch (e: IOException) {
       // swallow
     }
@@ -111,7 +115,8 @@ class KFrescoVitoDrawable(
       configure(
           dataModel = if (drawable == null) null else DrawableImageDataModel(drawable),
           roundingOptions = null,
-          borderOptions = null)
+          borderOptions = null,
+      )
     }
     return drawable
   }
@@ -133,19 +138,23 @@ class KFrescoVitoDrawable(
     callerContext = null
     _intrinsicWidth = -1
     _intrinsicHeight = -1
+    forceReloadIfImageAlreadySet = false
+    retriggerListenersIfImageAlreadySet = false
 
     placeholderLayer.reset()
     actualImageLayer.reset()
     progressLayer?.reset()
     overlayImageLayer.reset()
     debugOverlayImageLayer?.reset()
+    backgroundLayer?.reset()
     hasBoundsSet = false
 
     listenerManager.onReset(
         resetVitoImageRequestListener,
         resetLocalVitoImageRequestListener,
         resetLocalImagePerfStateListener,
-        resetControllerListener2)
+        resetControllerListener2,
+    )
   }
 
   private var drawableColorFilter: ColorFilter? = null
@@ -158,11 +167,13 @@ class KFrescoVitoDrawable(
   var progressLayer: ImageLayerDataModel? = null
   val overlayImageLayer = createLayer()
   var debugOverlayImageLayer: ImageLayerDataModel? = null
+  var backgroundLayer: ImageLayerDataModel? = null
 
   override fun draw(canvas: Canvas) {
     if (!hasBoundsSet) {
       setLayerBounds(bounds)
     }
+    backgroundLayer?.draw(canvas)
     placeholderLayer.draw(canvas)
     actualImageLayer.draw(canvas)
     progressLayer?.draw(canvas)
@@ -182,6 +193,7 @@ class KFrescoVitoDrawable(
       progressLayer?.configure(bounds = bounds)
       overlayImageLayer.configure(bounds = bounds)
       debugOverlayImageLayer?.configure(bounds = bounds)
+      backgroundLayer?.configure(bounds = bounds)
       hasBoundsSet = true
     }
   }
@@ -192,16 +204,17 @@ class KFrescoVitoDrawable(
     progressLayer?.setAlpha(alpha)
     overlayImageLayer.setAlpha(alpha)
     debugOverlayImageLayer?.setAlpha(alpha)
+    backgroundLayer?.setAlpha(alpha)
   }
 
   override fun setColorFilter(colorFilter: ColorFilter?) {
     drawableColorFilter = colorFilter
   }
 
-  // TODO(T105148151) Calculate opacity based on layers
   override fun getOpacity(): Int = PixelFormat.TRANSPARENT
 
-  internal fun createLayer() = ImageLayerDataModel(callbackProvider, invalidateLayerCallback)
+  internal fun createLayer() =
+      ImageLayerDataModel(callbackProvider, invalidateLayerCallback, optimizeAlphaHandling)
 
   override fun invalidateDrawable(who: Drawable) {
     invalidateSelf()
@@ -228,6 +241,8 @@ class KFrescoVitoDrawable(
     // TODO
     throw UnsupportedOperationException("Not implemented for KVito")
   }
+
+  override fun hasBitmapWithGainmap(): Boolean = actualImageLayer.hasBitmapWithGainmap() == true
 
   override fun reportVisible(visible: Boolean) {
     getImagePerfLoggingListener()?.reportVisible(visible)

@@ -56,7 +56,7 @@ public class GifImage implements AnimatedImage, AnimatedImageDecoder {
    * @param source the data to the image (a copy will be made)
    */
   public static GifImage createFromByteArray(byte[] source) {
-    Preconditions.checkNotNull(source);
+    Preconditions.checkNotNull(source, "Source byte array cannot be null");
 
     ByteBuffer byteBuffer = ByteBuffer.allocateDirect(source.length);
     byteBuffer.put(source);
@@ -140,6 +140,7 @@ public class GifImage implements AnimatedImage, AnimatedImageDecoder {
     mNativeContext = nativeContext;
   }
 
+  // This is a valid use of finalize. No other mechanism is appropriate.
   @Override
   protected void finalize() {
     nativeFinalize();

@@ -7,9 +7,10 @@
 
 package com.facebook.imagepipeline.producers;
 
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.Mockito.*;
 
+import android.net.Uri;
 import com.facebook.common.internal.Throwables;
 import com.facebook.common.memory.ByteArrayPool;
 import com.facebook.common.memory.PooledByteBuffer;
@@ -76,8 +77,9 @@ public class NetworkFetchProducerTest {
             Priority.MEDIUM,
             mConfig);
     when(mConfig.getProgressiveJpegConfig()).thenReturn(mProgressiveJpegConfig);
-    when(mProgressiveJpegConfig.decodeProgressively()).thenReturn(true);
+    when(mProgressiveJpegConfig.decodeProgressively(mImageRequest)).thenReturn(true);
     mFetchState = new FetchState(mConsumer, mProducerContext);
+    when(mImageRequest.getSourceUri()).thenReturn(Uri.parse("http://www.facebook.com"));
     mCommonByteArray = new byte[10];
     when(mByteArrayPool.get(anyInt())).thenReturn(mCommonByteArray);
     when(mPooledByteBufferFactory.newOutputStream(anyInt()))
@@ -145,7 +147,7 @@ public class NetworkFetchProducerTest {
             NetworkFetchProducer.PRODUCER_NAME,
             NetworkFetchProducer.INTERMEDIATE_RESULT_PRODUCER_EVENT);
     // Test final result
-    verify(mConsumer, times(1)).onNewResult(anyObject(), eq(Consumer.IS_LAST));
+    verify(mConsumer, times(1)).onNewResult(any(), eq(Consumer.IS_LAST));
     verifyPooledByteBufferUsed(1);
     // When everything is over, pooled byte buffer output stream should be closed
     verify(mPooledByteBufferOutputStream).close();
@@ -175,7 +177,7 @@ public class NetworkFetchProducerTest {
             mProducerContext,
             NetworkFetchProducer.PRODUCER_NAME,
             NetworkFetchProducer.INTERMEDIATE_RESULT_PRODUCER_EVENT);
-    verify(mConsumer, times(1)).onNewResult(anyObject(), eq(Consumer.NO_FLAGS));
+    verify(mConsumer, times(1)).onNewResult(any(), eq(Consumer.NO_FLAGS));
     verifyPooledByteBufferUsed(1);
 
     // Read another 1024 bytes, but do not bump timer - consumer should not be notified
@@ -186,7 +188,7 @@ public class NetworkFetchProducerTest {
             mProducerContext,
             NetworkFetchProducer.PRODUCER_NAME,
             NetworkFetchProducer.INTERMEDIATE_RESULT_PRODUCER_EVENT);
-    verify(mConsumer, times(1)).onNewResult(anyObject(), eq(Consumer.NO_FLAGS));
+    verify(mConsumer, times(1)).onNewResult(any(), eq(Consumer.NO_FLAGS));
     verifyPooledByteBufferUsed(1);
 
     // Read another 1024 bytes - this time bump timer. Consumer should be notified
@@ -199,11 +201,11 @@ public class NetworkFetchProducerTest {
             mProducerContext,
             NetworkFetchProducer.PRODUCER_NAME,
             NetworkFetchProducer.INTERMEDIATE_RESULT_PRODUCER_EVENT);
-    verify(mConsumer, times(2)).onNewResult(anyObject(), eq(Consumer.NO_FLAGS));
+    verify(mConsumer, times(2)).onNewResult(any(), eq(Consumer.NO_FLAGS));
     verifyPooledByteBufferUsed(2);
 
     // Test final result
-    verify(mConsumer, times(0)).onNewResult(anyObject(), eq(Consumer.IS_LAST));
+    verify(mConsumer, times(0)).onNewResult(any(), eq(Consumer.IS_LAST));
     inputStream.signalEof();
     requestHandlerFuture.get();
     verify(mProducerListener, times(2))
@@ -216,7 +218,7 @@ public class NetworkFetchProducerTest {
             eq(mProducerContext), eq(NetworkFetchProducer.PRODUCER_NAME), eq(mExtrasMap));
     verify(mProducerListener)
         .onUltimateProducerReached(mProducerContext, NetworkFetchProducer.PRODUCER_NAME, true);
-    verify(mConsumer, times(1)).onNewResult(anyObject(), eq(Consumer.IS_LAST));
+    verify(mConsumer, times(1)).onNewResult(any(), eq(Consumer.IS_LAST));
     verifyPooledByteBufferUsed(3);
 
     // When everything is over, pooled byte buffer output stream should be closed
@@ -231,7 +233,7 @@ public class NetworkFetchProducerTest {
     when(mNetworkFetcher.shouldPropagate(any(FetchState.class))).thenReturn(false);
     try {
       callback.onResponse(inputStream, 100);
-      fail();
+      fail("Expected exception to be thrown");
     } catch (Exception e) {
       verify(mPooledByteBufferFactory).newOutputStream(100);
       verify(mPooledByteBufferOutputStream).close();
@@ -279,7 +281,7 @@ public class NetworkFetchProducerTest {
 
     @Override
     public int read() throws IOException {
-      fail();
+      fail("This method should not be called");
       return 0;
     }
 

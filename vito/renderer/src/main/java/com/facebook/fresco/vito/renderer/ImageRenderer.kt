@@ -13,12 +13,13 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Shader
-import android.os.Build
 import com.facebook.fresco.vito.renderer.util.ColorUtils
 
 typealias RenderCommand = (Canvas) -> Unit
 
 object ImageRenderer {
+
+  var optimizeAlphaHandling: Boolean = false
 
   /**
    * Creates an image data model render command.
@@ -30,7 +31,7 @@ object ImageRenderer {
       model: ImageDataModel,
       shape: Shape,
       paint: Paint,
-      imageTransformation: Matrix? = null
+      imageTransformation: Matrix? = null,
   ): RenderCommand {
     return when (model) {
       is BitmapImageDataModel -> model.createRenderCommand(shape, paint, imageTransformation)
@@ -42,7 +43,7 @@ object ImageRenderer {
   inline fun BitmapImageDataModel.createRenderCommand(
       shape: Shape,
       paint: Paint,
-      imageTransformation: Matrix? = null
+      imageTransformation: Matrix? = null,
   ): RenderCommand =
       when (shape) {
         is RectShape -> bitmapRenderCommand(paint, bitmap, imageTransformation)
@@ -82,20 +83,24 @@ object ImageRenderer {
                   shape.rect.left.toInt(),
                   shape.rect.top.toInt(),
                   shape.rect.right.toInt(),
-                  shape.rect.bottom.toInt())
+                  shape.rect.bottom.toInt(),
+              )
             }
             // Some drawable types (eg VectorDrawable) will always invalidate when colorFilter
             // is modified, so check the current value before we update it
-            if (Build.VERSION.SDK_INT < 21 || drawable.colorFilter != paint.colorFilter) {
+            if (drawable.colorFilter != paint.colorFilter) {
               drawable.colorFilter = paint.colorFilter
             }
-            drawable.alpha = paint.alpha
+            val paintAlpha = paint.alpha
+            if (!optimizeAlphaHandling || drawable.alpha != paintAlpha) {
+              drawable.alpha = paintAlpha
+            }
             drawable.draw(canvas)
           }
       else -> {
         return { canvas ->
           drawable.setBounds(0, 0, width, height)
-          if (Build.VERSION.SDK_INT < 21 || drawable.colorFilter != null) {
+          if (drawable.colorFilter != null) {
             // The Paint handles the color filter
             drawable.colorFilter = null
           }
@@ -111,7 +116,7 @@ object ImageRenderer {
   inline fun bitmapRenderCommand(
       paint: Paint,
       bitmap: Bitmap,
-      imageTransformation: Matrix?
+      imageTransformation: Matrix?,
   ): RenderCommand = { canvas ->
     canvas.concat(imageTransformation)
     canvas.drawBitmap(bitmap, 0f, 0f, paint)

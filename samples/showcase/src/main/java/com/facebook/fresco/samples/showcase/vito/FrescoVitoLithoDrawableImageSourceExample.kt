@@ -31,11 +31,12 @@ object FrescoVitoLithoDrawableImageSourceExample : LithoSample {
   override fun createLithoComponent(
       c: ComponentContext,
       uris: ImageUriProvider,
-      callerContext: Any
+      callerContext: Any,
   ): Component =
       FrescoVitoImage2.create(c)
           .imageSource(
-              DrawableImageSource(ContextCompat.getDrawable(c.androidContext, R.drawable.logo)!!))
+              DrawableImageSource(ContextCompat.getDrawable(c.androidContext, R.drawable.logo)!!)
+          )
           .imageOptions(IMAGE_OPTIONS)
           .callerContext("FrescoVitoLithoDrawableImageSourceExample")
           .build()
