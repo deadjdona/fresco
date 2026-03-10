@@ -31,6 +31,7 @@ import com.facebook.fresco.animation.bitmap.preparation.DefaultBitmapFramePrepar
 import com.facebook.fresco.animation.bitmap.preparation.FixedNumberBitmapFramePreparationStrategy
 import com.facebook.fresco.animation.bitmap.preparation.FrameLoaderStrategy
 import com.facebook.fresco.animation.bitmap.preparation.ondemandanimation.FrameLoaderFactory
+import com.facebook.fresco.animation.bitmap.preparation.ondemandanimation.ZeroFrameDimensionsListener
 import com.facebook.fresco.animation.bitmap.wrapper.AnimatedDrawableBackendAnimationInformation
 import com.facebook.fresco.animation.bitmap.wrapper.AnimatedDrawableBackendFrameRenderer
 import com.facebook.fresco.animation.drawable.AnimatedDrawable2
@@ -67,6 +68,8 @@ class DefaultBitmapAnimationDrawableFactory(
     private val animationFpsLimit: Supplier<Int>,
     private val bufferLengthMilliseconds: Supplier<Int>,
     private val animatedImagePerfLoggingListener: AnimatedImagePerfLoggingListener? = null,
+    private val enableBufferFrameLoaderFix: Boolean = false,
+    private val zeroFrameDimensionsListener: ZeroFrameDimensionsListener? = null,
 ) : DrawableFactory, ImageOptionsDrawableFactory {
 
   // Change the value to true to use KAnimatedDrawable2.kt
@@ -196,6 +199,8 @@ class DefaultBitmapAnimationDrawableFactory(
                   platformBitmapFactory,
                   animationFpsLimit.get(),
                   bufferLengthMilliseconds.get(),
+                  enableBufferFrameLoaderFix,
+                  zeroFrameDimensionsListener,
               ),
               downscaleFrameToDrawableDimensions.get(),
           )

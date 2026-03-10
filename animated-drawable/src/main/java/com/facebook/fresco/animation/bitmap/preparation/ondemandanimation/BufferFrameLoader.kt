@@ -34,6 +34,8 @@ class BufferFrameLoader(
     private val fpsCompressor: FpsCompressorInfo,
     override val animationInformation: AnimationInformation,
     private val bufferLengthMilliseconds: Int,
+    private val enableBufferFrameLoaderFix: Boolean = false,
+    private val zeroFrameDimensionsListener: ZeroFrameDimensionsListener? = null,
 ) : FrameLoader {
 
   private val bufferSize =
@@ -54,8 +56,23 @@ class BufferFrameLoader(
 
   @UiThread
   override fun getFrame(frameNumber: Int, width: Int, height: Int): FrameResult {
-    val cachedFrameIndex =
-        compressionFrameMap[frameNumber] ?: return findNearestToRender(frameNumber)
+    val cachedFrameIndex = compressionFrameMap[frameNumber]
+
+    // Return the nearest frame if the frame is not in the buffer OR width or height is 0
+    if (enableBufferFrameLoaderFix && (width == 0 || height == 0)) {
+      zeroFrameDimensionsListener?.onZeroFrameDimensions(
+          origin = "BufferFrameLoader.getFrame",
+          frameNumber,
+          width,
+          height,
+      )
+
+      return findNearestToRender(frameNumber)
+    }
+
+    if (cachedFrameIndex == null) {
+      return findNearestToRender(frameNumber)
+    }
 
     lastRenderedFrameNumber = cachedFrameIndex
 
@@ -113,11 +130,19 @@ class BufferFrameLoader(
   }
 
   private fun loadNextFrames(width: Int, height: Int) {
-    if (isFetching) {
+    // Skip frame if width or height is 0 OR if the buffer is already loading
+    if ((enableBufferFrameLoaderFix && (width == 0 || height == 0)) || isFetching) {
+      zeroFrameDimensionsListener?.onZeroFrameDimensions(
+          origin = "BufferFrameLoader.loadNextFrames",
+          frameNumber = lastRenderedFrameNumber.coerceAtLeast(0),
+          width,
+          height,
+      )
+
       return
     }
-    isFetching = true
 
+    isFetching = true
     AnimationLoaderExecutor.execute {
       do {
         val targetFrame = lastRenderedFrameNumber.coerceAtLeast(0)

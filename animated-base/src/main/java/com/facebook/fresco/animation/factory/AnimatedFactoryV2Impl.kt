@@ -17,6 +17,7 @@ import com.facebook.common.internal.DoNotStrip
 import com.facebook.common.internal.Supplier
 import com.facebook.common.internal.Suppliers
 import com.facebook.common.time.RealtimeSinceBootClock
+import com.facebook.fresco.animation.bitmap.preparation.ondemandanimation.ZeroFrameDimensionsListener
 import com.facebook.fresco.animation.drawable.AnimatedDrawable2
 import com.facebook.imagepipeline.animated.base.AnimatedDrawableBackend
 import com.facebook.imagepipeline.animated.base.AnimatedImageResult
@@ -50,6 +51,8 @@ constructor(
     var animationFpsLimit: Int,
     var bufferLengthMilliseconds: Int,
     var serialExecutorService: SerialExecutorService?,
+    private val enableBufferFrameLoaderFix: Boolean = false,
+    private val zeroFrameDimensionsListener: ZeroFrameDimensionsListener? = null,
 ) : AnimatedFactory {
 
   private var animatedDrawableBackendProvider: AnimatedDrawableBackendProvider? = null
@@ -89,6 +92,9 @@ constructor(
         Suppliers.of(downscaleFrameToDrawableDimensions),
         Suppliers.of(animationFpsLimit),
         Suppliers.of(bufferLengthMilliseconds),
+        null,
+        enableBufferFrameLoaderFix,
+        zeroFrameDimensionsListener,
     )
   }
 

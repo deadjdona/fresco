@@ -18,7 +18,6 @@ import com.facebook.cache.common.WriterCallback
 import com.facebook.cache.disk.DiskStorage.DiskDumpInfo
 import com.facebook.common.disk.DiskTrimmable
 import com.facebook.common.disk.DiskTrimmableRegistry
-import com.facebook.common.internal.Preconditions
 import com.facebook.common.logging.FLog
 import com.facebook.common.statfs.StatFsHelper
 import com.facebook.common.time.Clock
@@ -210,7 +209,7 @@ class DiskStorageCache(
           }
           resourceIndex.remove(resourceId)
         } else {
-          Preconditions.checkNotNull<String?>(resourceId)
+          checkNotNull(resourceId)
           if (cacheEventListener != null) {
             cacheEventListener.onHit(cacheEvent)
           }
@@ -695,8 +694,8 @@ class DiskStorageCache(
           maxTimeDelta =
               max((entry.getTimestamp() - now).toDouble(), maxTimeDelta.toDouble()).toLong()
         } else if (indexPopulateAtStartupEnabled) {
-          Preconditions.checkNotNull<MutableSet<String?>?>(tempResourceIndex)
-          tempResourceIndex!!.add(entry.getId())
+          checkNotNull(tempResourceIndex)
+          tempResourceIndex.add(entry.getId())
         }
       }
       if (foundFutureTimestamp) {
@@ -715,9 +714,9 @@ class DiskStorageCache(
       }
       if (cacheStats.count != count.toLong() || cacheStats.size != size) {
         if (indexPopulateAtStartupEnabled && resourceIndex !== tempResourceIndex) {
-          Preconditions.checkNotNull<MutableSet<String?>?>(tempResourceIndex)
+          checkNotNull(tempResourceIndex)
           resourceIndex.clear()
-          resourceIndex.addAll(tempResourceIndex!!)
+          resourceIndex.addAll(tempResourceIndex)
         }
         cacheStats.set(size, count.toLong())
       }
