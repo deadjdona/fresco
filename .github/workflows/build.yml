@@ -1,4 +1,6 @@
 name: facebook/fresco/build
+permissions:
+  contents: read
 on:
   push:
     branches:
