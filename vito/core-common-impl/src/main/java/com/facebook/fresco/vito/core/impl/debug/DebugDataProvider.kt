@@ -5,8 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@file:SuppressLint("ColorConstantUsageIssue")
+
 package com.facebook.fresco.vito.core.impl.debug
 
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import com.facebook.fresco.ui.common.ControllerListener2.Extras
@@ -68,6 +71,111 @@ fun abbreviateOrigin(origin: String): String =
       "local" -> "LOCAL"
       else -> origin.uppercase(Locale.US).take(4)
     }
+
+/**
+ * Configuration for the I:D fit ratio visualization.
+ *
+ * The debug overlay shows the image fit ratio with color-coded background tinting. This is
+ * automatically enabled in debug builds when the debug overlay is active.
+ *
+ * @param greenMinRatio minimum ratio for green (perfect fit). Default 0.9
+ * @param greenMaxRatio maximum ratio for green (perfect fit). Default 1.1
+ * @param yellowMaxRatio maximum ratio for yellow (slightly oversized). Default 1.5. Ratios below
+ *   [greenMinRatio] or above [yellowMaxRatio] are red.
+ * @param wastedMemoryRedThresholdBytes wasted memory threshold in bytes above which the overlay
+ *   turns red. Default 1 MiB.
+ */
+data class ImageFitRatioConfig(
+    val greenMinRatio: Float = 0.9f,
+    val greenMaxRatio: Float = 1.1f,
+    val yellowMaxRatio: Float = 1.5f,
+    val wastedMemoryRedThresholdBytes: Long = 1L * 1024 * 1024,
+)
+
+/**
+ * Computes the I:D fit ratio and returns a formatted string with a color indicating the fit
+ * quality.
+ *
+ * The ratio is computed as max(imageWidth/drawableWidth, imageHeight/drawableHeight) to capture the
+ * worst-case dimension.
+ *
+ * Color coding (using thresholds from [config]):
+ * - Green: greenMinRatio <= ratio <= greenMaxRatio (perfect fit)
+ * - Yellow: greenMaxRatio < ratio <= yellowMaxRatio (slightly oversized)
+ * - Red: ratio < greenMinRatio (undersized) or ratio > yellowMaxRatio (oversized)
+ */
+fun computeImageFitRatioAndColor(
+    imageWidth: Int,
+    imageHeight: Int,
+    drawableWidth: Int,
+    drawableHeight: Int,
+    config: ImageFitRatioConfig = ImageFitRatioConfig(),
+): Pair<String, Int> {
+  if (imageWidth <= 0 || imageHeight <= 0 || drawableWidth <= 0 || drawableHeight <= 0) {
+    return "" to Color.GRAY
+  }
+  val widthRatio = imageWidth.toFloat() / drawableWidth
+  val heightRatio = imageHeight.toFloat() / drawableHeight
+  val ratio = maxOf(widthRatio, heightRatio)
+  val formatted = String.format(Locale.US, "%.2f", ratio)
+  val color =
+      when {
+        ratio < config.greenMinRatio -> Color.RED
+        ratio <= config.greenMaxRatio -> Color.GREEN
+        ratio <= config.yellowMaxRatio -> Color.YELLOW
+        else -> Color.RED
+      }
+  return formatted to color
+}
+
+/** Default bytes per pixel, assuming ARGB_8888 bitmap config. */
+const val DEFAULT_BYTES_PER_PIXEL = 4
+
+/**
+ * Computes the wasted memory from an oversized image and returns a formatted string with a color.
+ *
+ * Memory usage per image = width * height * bytesPerPixel. Wasted memory is the difference between
+ * the image's memory footprint and what would be needed for the target dimensions.
+ *
+ * Color coding:
+ * - Red: wasted > (default 1 MiB)
+ * - Green: wasted > 0 but within threshold
+ * - Gray: no waste or invalid dimensions
+ */
+fun computeWastedMemoryAndColor(
+    imageWidth: Int,
+    imageHeight: Int,
+    drawableWidth: Int,
+    drawableHeight: Int,
+    bytesPerPixel: Int = DEFAULT_BYTES_PER_PIXEL,
+    config: ImageFitRatioConfig = ImageFitRatioConfig(),
+): Pair<String, Int> {
+  // bytesPerPixel <= 0 covers vector graphics and other non-raster images
+  if (
+      imageWidth <= 0 ||
+          imageHeight <= 0 ||
+          drawableWidth <= 0 ||
+          drawableHeight <= 0 ||
+          bytesPerPixel <= 0
+  ) {
+    return "" to Color.GRAY
+  }
+  val imageBytes = imageWidth.toLong() * imageHeight * bytesPerPixel
+  val targetBytes = drawableWidth.toLong() * drawableHeight * bytesPerPixel
+  val wastedBytes = maxOf(0L, imageBytes - targetBytes)
+  if (wastedBytes == 0L) {
+    return "0 B" to Color.GREEN
+  }
+  val formatted =
+      when {
+        wastedBytes >= 1024L * 1024 ->
+            String.format(Locale.US, "%.1f MiB", wastedBytes / (1024.0 * 1024))
+        wastedBytes >= 1024L -> String.format(Locale.US, "%.1f KiB", wastedBytes / 1024.0)
+        else -> "$wastedBytes B"
+      }
+  val color = if (wastedBytes > config.wastedMemoryRedThresholdBytes) Color.RED else Color.GREEN
+  return formatted to color
+}
 
 /** Truncates a URI to show only the last part of the path. */
 fun truncateUri(uri: String, maxLength: Int = 20): String {

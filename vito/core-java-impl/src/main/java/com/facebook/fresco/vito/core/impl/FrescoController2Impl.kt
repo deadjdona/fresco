@@ -201,7 +201,6 @@ open class FrescoController2Impl(
         // Immediately display the actual image.
         setActualImage(drawable, imageRequest, bitmapRef, true, null)
         drawable.setFetchSubmitted(true)
-        debugOverlayFactory.update(drawable, extras)
         true
       } finally {
         CloseableReference.closeSafely(bitmapRef)
@@ -246,7 +245,6 @@ open class FrescoController2Impl(
         // Immediately display the actual image.
         setActualImage(drawable, imageRequest, cachedImage, true, null, isIntermediateImage)
         drawable.setFetchSubmitted(true)
-        debugOverlayFactory.update(drawable, extras)
         if (!isIntermediateImage) {
           return true
         } else {
@@ -362,20 +360,24 @@ open class FrescoController2Impl(
         imageRequest.imageOptions,
         drawable.callerContext,
     )
-    val actualDrawable =
-        image?.let { closeableImageRef ->
-          if (config.enablePrepareToDrawOnFetch()) {
-            val img = closeableImageRef.get()
-            if (img is CloseableBitmap) {
-              img.underlyingBitmap.prepareToDraw()
-            }
+    val actualDrawable = image?.let { closeableImageRef ->
+      if (config.enablePrepareToDrawOnFetch()) {
+        val img = closeableImageRef.get()
+        if (img is CloseableBitmap) {
+          val bitmap = img.underlyingBitmap
+          if (bitmap != null) {
+            bitmap.prepareToDraw()
+          } else {
+            FLog.w(TAG, "underlyingBitmap is null during prepareToDraw, image may be closed")
           }
-          hierarcher.buildActualImageDrawable(
-              imageRequest.resources,
-              imageRequest.imageOptions,
-              closeableImageRef,
-          )
         }
+      }
+      hierarcher.buildActualImageDrawable(
+          imageRequest.resources,
+          imageRequest.imageOptions,
+          closeableImageRef,
+      )
+    }
 
     actualImageWrapperDrawable.setCurrent(actualDrawable ?: NopDrawable)
     drawable.setImage(actualImageWrapperDrawable, image)

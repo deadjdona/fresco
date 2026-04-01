@@ -319,6 +319,7 @@ public class WrappingUtils {
     return drawable;
   }
 
+  private
   /** Applies the given rounding params on the specified rounded drawable. */
   static void applyRoundingParams(Rounded rounded, RoundingParams roundingParams) {
     rounded.setCircle(roundingParams.getRoundAsCircle());
@@ -341,6 +342,7 @@ public class WrappingUtils {
     rounded.setRepeatEdgePixels(RoundedBitmapDrawable.getDefaultRepeatEdgePixels());
   }
 
+  private
   /** Finds the immediate parent of a leaf drawable. */
   static DrawableParent findDrawableParentForLeaf(DrawableParent parent) {
     while (true) {
