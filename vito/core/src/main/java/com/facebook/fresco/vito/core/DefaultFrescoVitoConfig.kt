@@ -104,6 +104,18 @@ constructor(override val prefetchConfig: PrefetchConfig = DefaultPrefetchConfig(
 
   override fun experimentalOptimizeAlphaHandling(): Boolean = false
 
+  override fun enableRetriggerListenersIfImageAlreadySet(): Boolean = false
+
+  override fun fixOnBindRetriggerListenersClobber(): Boolean = false
+
+  override fun disableBitmapCacheShortcut(): Boolean = false
+
+  override fun useOfferBackOnRelease(): Boolean = false
+
+  override fun useOfferBackOnReleaseForNonBitmapImage(): Boolean = false
+
+  override fun releaseImageOnVisibilityGoneImmediately(): Boolean = false
+
   open class DefaultPrefetchConfig : PrefetchConfig {
     override fun prefetchInOnPrepare(): Boolean = true
 

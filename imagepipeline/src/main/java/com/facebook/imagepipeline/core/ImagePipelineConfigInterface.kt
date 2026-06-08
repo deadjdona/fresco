@@ -24,6 +24,7 @@ import com.facebook.imagepipeline.cache.ImageCacheStatsTracker
 import com.facebook.imagepipeline.cache.MemoryCache
 import com.facebook.imagepipeline.cache.MemoryCache.CacheTrimStrategy
 import com.facebook.imagepipeline.cache.MemoryCacheParams
+import com.facebook.imagepipeline.cache.SimilarImageLookup
 import com.facebook.imagepipeline.debug.CloseableReferenceLeakTracker
 import com.facebook.imagepipeline.decoder.ImageDecoder
 import com.facebook.imagepipeline.decoder.ImageDecoderConfig
@@ -36,6 +37,7 @@ import com.facebook.imagepipeline.producers.CustomProducerSequenceFactory
 import com.facebook.imagepipeline.producers.DecodeProducer
 import com.facebook.imagepipeline.producers.NetworkFetcher
 import com.facebook.imagepipeline.transcoder.ImageTranscoderFactory
+import com.facebook.imagepipeline.transformation.BitmapTransformation
 
 interface ImagePipelineConfigInterface {
 
@@ -66,6 +68,16 @@ interface ImagePipelineConfigInterface {
   val bitmapMemoryCacheEntryStateObserver: EntryStateObserver<CacheKey>?
   val bitmapCacheOverride: MemoryCache<CacheKey, CloseableImage>?
 
+  // Non-bitmap memory cache (used when experiments.useSeparateNonBitmapImageCache is on). Sizes
+  // the separate cache that holds CloseableAnimatedImage and any other non-CloseableBitmap value.
+  // Falls back to [bitmapMemoryCacheParamsSupplier] when null.
+  val nonBitmapImageMemoryCacheParamsSupplier: Supplier<MemoryCacheParams>?
+
+  // Similar-image lookup (optional). When non-null, future similarity producers can find larger
+  // cached variants of the same image to avoid redundant network fetches.
+  val similarImageLookup: SimilarImageLookup?
+    get() = null
+
   // Network configuration
   val networkFetcher: NetworkFetcher<*>
   val isResizeAndRotateEnabledForNetwork: Boolean
@@ -80,6 +92,14 @@ interface ImagePipelineConfigInterface {
   val enableEncodedImageColorSpaceUsage: Supplier<Boolean>
   val progressiveJpegConfig: ProgressiveJpegConfig
   val platformBitmapFactory: PlatformBitmapFactory?
+
+  /**
+   * Default [BitmapTransformation] applied to intermediate progressive JPEG scans when the
+   * per-request [ImageDecodeOptions.intermediateImageBitmapTransformation] is not set. This enables
+   * pipeline-wide progressive blur without per-request wiring. Set to null to disable.
+   */
+  val defaultIntermediateImageBitmapTransformation: BitmapTransformation?
+    get() = null
 
   // Memory handling
   @get:MemoryChunkType val memoryChunkType: Int

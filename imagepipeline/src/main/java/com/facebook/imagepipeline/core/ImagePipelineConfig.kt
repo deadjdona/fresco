@@ -40,6 +40,7 @@ import com.facebook.imagepipeline.cache.MemoryCache.CacheTrimStrategy
 import com.facebook.imagepipeline.cache.MemoryCacheParams
 import com.facebook.imagepipeline.cache.NativeMemoryCacheTrimStrategy
 import com.facebook.imagepipeline.cache.NoOpImageCacheStatsTracker
+import com.facebook.imagepipeline.cache.SimilarImageLookup
 import com.facebook.imagepipeline.debug.CloseableReferenceLeakTracker
 import com.facebook.imagepipeline.debug.NoOpCloseableReferenceLeakTracker
 import com.facebook.imagepipeline.decoder.ImageDecoder
@@ -60,6 +61,7 @@ import com.facebook.imagepipeline.systrace.FrescoSystrace.endSection
 import com.facebook.imagepipeline.systrace.FrescoSystrace.isTracing
 import com.facebook.imagepipeline.systrace.FrescoSystrace.traceSection
 import com.facebook.imagepipeline.transcoder.ImageTranscoderFactory
+import com.facebook.imagepipeline.transformation.BitmapTransformation
 
 /**
  * Main configuration class for the image pipeline library.
@@ -101,6 +103,7 @@ class ImagePipelineConfig private constructor(builder: Builder) : ImagePipelineC
   private val httpNetworkTimeout: Int
   override val platformBitmapFactory: PlatformBitmapFactory?
   override val poolFactory: PoolFactory
+  override val defaultIntermediateImageBitmapTransformation: BitmapTransformation?
   override val progressiveJpegConfig: ProgressiveJpegConfig
   override val requestListeners: Set<RequestListener>
   override val requestListener2s: Set<RequestListener2>
@@ -113,9 +116,11 @@ class ImagePipelineConfig private constructor(builder: Builder) : ImagePipelineC
   override val callerContextVerifier: CallerContextVerifier?
   override val closeableReferenceLeakTracker: CloseableReferenceLeakTracker
   override val bitmapCacheOverride: MemoryCache<CacheKey, CloseableImage>?
+  override val similarImageLookup: SimilarImageLookup?
   override val encodedMemoryCacheOverride: MemoryCache<CacheKey, PooledByteBuffer>?
   override val executorServiceForAnimatedImages: SerialExecutorService?
   override val bitmapMemoryCacheFactory: BitmapMemoryCacheFactory
+  override val nonBitmapImageMemoryCacheParamsSupplier: Supplier<MemoryCacheParams>?
   override val dynamicDiskCacheConfigMap: Map<String, DiskCacheConfig>?
   override val decodedOriginalImageAnalyzers: Set<DecodeProducer.DecodedOriginalImageAnalyzer>
   override val isAppStarting: (() -> Boolean)? = null
@@ -165,6 +170,8 @@ class ImagePipelineConfig private constructor(builder: Builder) : ImagePipelineC
         }
     platformBitmapFactory = builder.platformBitmapFactory
     poolFactory = builder.poolFactory ?: PoolFactory(PoolConfig.newBuilder().build())
+    defaultIntermediateImageBitmapTransformation =
+        builder.defaultIntermediateImageBitmapTransformation
     progressiveJpegConfig = builder.progressiveJpegConfig ?: SimpleProgressiveJpegConfig()
     requestListeners = builder.requestListeners ?: emptySet()
     requestListener2s = builder.requestListener2s ?: emptySet()
@@ -180,8 +187,10 @@ class ImagePipelineConfig private constructor(builder: Builder) : ImagePipelineC
     callerContextVerifier = builder.callerContextVerifier
     closeableReferenceLeakTracker = builder.closeableReferenceLeakTracker
     bitmapCacheOverride = builder.bitmapMemoryCache
+    similarImageLookup = builder.similarImageLookup
     bitmapMemoryCacheFactory =
         builder.bitmapMemoryCacheFactory ?: CountingLruBitmapMemoryCacheFactory()
+    nonBitmapImageMemoryCacheParamsSupplier = builder.nonBitmapImageMemoryCacheParamsSupplier
     encodedMemoryCacheOverride = builder.encodedMemoryCache
     executorServiceForAnimatedImages = builder.serialExecutorServiceForAnimatedImages
     dynamicDiskCacheConfigMap = builder.dynamicDiskCacheConfigMap
@@ -270,6 +279,9 @@ class ImagePipelineConfig private constructor(builder: Builder) : ImagePipelineC
     var poolFactory: PoolFactory? = null
       private set
 
+    var defaultIntermediateImageBitmapTransformation: BitmapTransformation? = null
+      private set
+
     var progressiveJpegConfig: ProgressiveJpegConfig? = null
       private set
 
@@ -314,6 +326,9 @@ class ImagePipelineConfig private constructor(builder: Builder) : ImagePipelineC
     var bitmapMemoryCache: MemoryCache<CacheKey, CloseableImage>? = null
       private set
 
+    var similarImageLookup: SimilarImageLookup? = null
+      private set
+
     var encodedMemoryCache: MemoryCache<CacheKey, PooledByteBuffer>? = null
       private set
 
@@ -321,6 +336,9 @@ class ImagePipelineConfig private constructor(builder: Builder) : ImagePipelineC
       private set
 
     var bitmapMemoryCacheFactory: BitmapMemoryCacheFactory? = null
+      private set
+
+    var nonBitmapImageMemoryCacheParamsSupplier: Supplier<MemoryCacheParams>? = null
       private set
 
     var dynamicDiskCacheConfigMap: Map<String, DiskCacheConfig>? = null
@@ -453,6 +471,10 @@ class ImagePipelineConfig private constructor(builder: Builder) : ImagePipelineC
       this.poolFactory = poolFactory
     }
 
+    fun setDefaultIntermediateImageBitmapTransformation(
+        transformation: BitmapTransformation?
+    ): Builder = apply { this.defaultIntermediateImageBitmapTransformation = transformation }
+
     fun setProgressiveJpegConfig(progressiveJpegConfig: ProgressiveJpegConfig?): Builder = apply {
       this.progressiveJpegConfig = progressiveJpegConfig
     }
@@ -507,6 +529,21 @@ class ImagePipelineConfig private constructor(builder: Builder) : ImagePipelineC
         apply {
           this.bitmapMemoryCacheFactory = bitmapMemoryCacheFactory
         }
+
+    /**
+     * Sets the [MemoryCacheParams] supplier used to size the separate animated/non-bitmap memory
+     * cache when [ImagePipelineExperiments.useSeparateNonBitmapImageCache] is enabled. When unset,
+     * the animated cache reuses [bitmapMemoryCacheParamsSupplier].
+     */
+    fun setNonBitmapImageMemoryCacheParamsSupplier(
+        nonBitmapImageMemoryCacheParamsSupplier: Supplier<MemoryCacheParams>?
+    ): Builder = apply {
+      this.nonBitmapImageMemoryCacheParamsSupplier = nonBitmapImageMemoryCacheParamsSupplier
+    }
+
+    fun setSimilarImageLookup(similarImageLookup: SimilarImageLookup?): Builder = apply {
+      this.similarImageLookup = similarImageLookup
+    }
 
     fun setDynamicDiskCacheConfigMap(
         dynamicDiskCacheConfigMap: Map<String, DiskCacheConfig>

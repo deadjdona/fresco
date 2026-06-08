@@ -10,6 +10,7 @@ package com.facebook.imagepipeline.core;
 import android.content.Context;
 import android.os.Build;
 import com.facebook.cache.common.CacheKey;
+import com.facebook.cache.disk.FileCache;
 import com.facebook.common.internal.AndroidPredicates;
 import com.facebook.common.internal.Objects;
 import com.facebook.common.internal.Preconditions;
@@ -23,12 +24,15 @@ import com.facebook.imagepipeline.animated.factory.AnimatedFactory;
 import com.facebook.imagepipeline.animated.factory.AnimatedFactoryProvider;
 import com.facebook.imagepipeline.bitmaps.PlatformBitmapFactory;
 import com.facebook.imagepipeline.bitmaps.PlatformBitmapFactoryProvider;
+import com.facebook.imagepipeline.cache.CountingLruBitmapMemoryCacheFactory;
 import com.facebook.imagepipeline.cache.CountingMemoryCache;
 import com.facebook.imagepipeline.cache.EncodedCountingMemoryCacheFactory;
 import com.facebook.imagepipeline.cache.EncodedMemoryCacheFactory;
 import com.facebook.imagepipeline.cache.InstrumentedMemoryCache;
 import com.facebook.imagepipeline.cache.InstrumentedMemoryCacheBitmapMemoryCacheFactory;
 import com.facebook.imagepipeline.cache.MemoryCache;
+import com.facebook.imagepipeline.cache.MemoryCacheParams;
+import com.facebook.imagepipeline.cache.RoutingBitmapMemoryCache;
 import com.facebook.imagepipeline.decoder.DefaultImageDecoder;
 import com.facebook.imagepipeline.decoder.ImageDecoder;
 import com.facebook.imagepipeline.drawable.DrawableFactory;
@@ -145,6 +149,9 @@ public class ImagePipelineFactory {
   public static synchronized void shutDown() {
     if (sInstance != null) {
       sInstance.getBitmapMemoryCache().removeAll(AndroidPredicates.<CacheKey>True());
+      if (sInstance.mNonBitmapImageMemoryCache != null) {
+        sInstance.mNonBitmapImageMemoryCache.removeAll(AndroidPredicates.<CacheKey>True());
+      }
       sInstance.getEncodedMemoryCache().removeAll(AndroidPredicates.<CacheKey>True());
       sInstance = null;
     }
@@ -155,6 +162,12 @@ public class ImagePipelineFactory {
   private final Supplier<DiskCachesStore> mDiskCachesStoreSupplier;
   @Nullable private CountingMemoryCache<CacheKey, CloseableImage> mBitmapCountingMemoryCache;
   @Nullable private InstrumentedMemoryCache<CacheKey, CloseableImage> mBitmapMemoryCache;
+
+  @Nullable
+  private CountingMemoryCache<CacheKey, CloseableImage> mNonBitmapImageCountingMemoryCache;
+
+  @Nullable private InstrumentedMemoryCache<CacheKey, CloseableImage> mNonBitmapImageMemoryCache;
+  @Nullable private MemoryCache<CacheKey, CloseableImage> mEffectiveBitmapMemoryCache;
   @Nullable private CountingMemoryCache<CacheKey, PooledByteBuffer> mEncodedCountingMemoryCache;
   @Nullable private InstrumentedMemoryCache<CacheKey, PooledByteBuffer> mEncodedMemoryCache;
   @Nullable private ImageDecoder mImageDecoder;
@@ -237,6 +250,59 @@ public class ImagePipelineFactory {
     return mBitmapMemoryCache;
   }
 
+  public CountingMemoryCache<CacheKey, CloseableImage> getNonBitmapImageCountingMemoryCache() {
+    if (mNonBitmapImageCountingMemoryCache == null) {
+      Supplier<MemoryCacheParams> paramsSupplier =
+          mConfig.getNonBitmapImageMemoryCacheParamsSupplier();
+      if (paramsSupplier == null) {
+        paramsSupplier = mConfig.getBitmapMemoryCacheParamsSupplier();
+      }
+      // Always use CountingLruBitmapMemoryCacheFactory here rather than
+      // mConfig.getBitmapMemoryCacheFactory(): some bitmap-cache factories (e.g.
+      // WeakBitmapMemoryCacheFactory used on the FB4A unified pipeline) produce caches that
+      // explicitly reject non-CloseableStaticBitmap entries, which would silently drop every
+      // animated/SVG image written here.
+      mNonBitmapImageCountingMemoryCache =
+          new CountingLruBitmapMemoryCacheFactory()
+              .create(
+                  paramsSupplier,
+                  mConfig.getMemoryTrimmableRegistry(),
+                  mConfig.getBitmapMemoryCacheTrimStrategy(),
+                  mConfig.getExperiments().getShouldStoreCacheEntrySize(),
+                  mConfig.getExperiments().getShouldIgnoreCacheSizeMismatch(),
+                  mConfig.getBitmapMemoryCacheEntryStateObserver());
+    }
+    return mNonBitmapImageCountingMemoryCache;
+  }
+
+  public InstrumentedMemoryCache<CacheKey, CloseableImage> getNonBitmapImageMemoryCache() {
+    if (mNonBitmapImageMemoryCache == null) {
+      mNonBitmapImageMemoryCache =
+          InstrumentedMemoryCacheBitmapMemoryCacheFactory.get(
+              getNonBitmapImageCountingMemoryCache(), mConfig.getImageCacheStatsTracker());
+    }
+    return mNonBitmapImageMemoryCache;
+  }
+
+  /**
+   * Returns the {@link MemoryCache} that producers should read/write through. When the {@link
+   * ImagePipelineExperiments#getUseSeparateNonBitmapImageCache()} flag is enabled, this is a {@link
+   * RoutingBitmapMemoryCache} that splits {@link CloseableImage} entries between the static-bitmap
+   * cache and a separate non-bitmap cache (animated images, XML/SVG decodes, etc.). Otherwise it is
+   * the plain {@link #getBitmapMemoryCache()}.
+   */
+  private MemoryCache<CacheKey, CloseableImage> getEffectiveBitmapMemoryCache() {
+    if (mEffectiveBitmapMemoryCache == null) {
+      if (mConfig.getExperiments().getUseSeparateNonBitmapImageCache()) {
+        mEffectiveBitmapMemoryCache =
+            new RoutingBitmapMemoryCache(getBitmapMemoryCache(), getNonBitmapImageMemoryCache());
+      } else {
+        mEffectiveBitmapMemoryCache = getBitmapMemoryCache();
+      }
+    }
+    return mEffectiveBitmapMemoryCache;
+  }
+
   public CountingMemoryCache<CacheKey, PooledByteBuffer> getEncodedCountingMemoryCache() {
     if (mEncodedCountingMemoryCache == null) {
       mEncodedCountingMemoryCache =
@@ -270,7 +336,12 @@ public class ImagePipelineFactory {
         if (mConfig.getImageDecoderConfig() == null) {
           Map<ImageFormat, ImageDecoder> allDecoders = new HashMap<>();
           addAnimatedDecoders(allDecoders);
-          mImageDecoder = new DefaultImageDecoder(xmlDecoder, getPlatformDecoder(), allDecoders);
+          mImageDecoder =
+              new DefaultImageDecoder(
+                  xmlDecoder,
+                  getPlatformDecoder(),
+                  allDecoders,
+                  mConfig.getDefaultIntermediateImageBitmapTransformation());
         } else {
           Map<ImageFormat, ImageDecoder> allDecoders = new HashMap<>();
           addAnimatedDecoders(allDecoders);
@@ -278,7 +349,12 @@ public class ImagePipelineFactory {
             allDecoders.putAll(mConfig.getImageDecoderConfig().getCustomImageDecoders());
           }
 
-          mImageDecoder = new DefaultImageDecoder(xmlDecoder, getPlatformDecoder(), allDecoders);
+          mImageDecoder =
+              new DefaultImageDecoder(
+                  xmlDecoder,
+                  getPlatformDecoder(),
+                  allDecoders,
+                  mConfig.getDefaultIntermediateImageBitmapTransformation());
           // Add custom image formats if needed
           ImageFormatChecker.getInstance()
               .setCustomImageFormatCheckers(
@@ -291,6 +367,14 @@ public class ImagePipelineFactory {
 
   public Supplier<DiskCachesStore> getDiskCachesStoreSupplier() {
     return mDiskCachesStoreSupplier;
+  }
+
+  public FileCache getMainFileCache() {
+    return mDiskCachesStoreSupplier.get().getMainFileCache();
+  }
+
+  public FileCache getSmallImageFileCache() {
+    return mDiskCachesStoreSupplier.get().getSmallImageFileCache();
   }
 
   public ImagePipeline getImagePipeline() {
@@ -306,7 +390,7 @@ public class ImagePipelineFactory {
         mConfig.getRequestListeners(),
         mConfig.getRequestListener2s(),
         mConfig.isPrefetchEnabledSupplier(),
-        getBitmapMemoryCache(),
+        getEffectiveBitmapMemoryCache(),
         getEncodedMemoryCache(),
         mDiskCachesStoreSupplier,
         mConfig.getCacheKeyFactory(),
@@ -354,7 +438,7 @@ public class ImagePipelineFactory {
                   mConfig.getExecutorSupplier(),
                   mConfig.getPoolFactory().getPooledByteBufferFactory(mConfig.getMemoryChunkType()),
                   mConfig.getPoolFactory().getPooledByteStreams(),
-                  getBitmapMemoryCache(),
+                  getEffectiveBitmapMemoryCache(),
                   getEncodedMemoryCache(),
                   mDiskCachesStoreSupplier,
                   mConfig.getCacheKeyFactory(),
@@ -439,6 +523,9 @@ public class ImagePipelineFactory {
     Objects.ToStringHelper b = Objects.toStringHelper("ImagePipelineFactory");
     if (mBitmapCountingMemoryCache != null) {
       b.add("bitmapCountingMemoryCache", mBitmapCountingMemoryCache.getDebugData());
+    }
+    if (mNonBitmapImageCountingMemoryCache != null) {
+      b.add("nonBitmapImageCountingMemoryCache", mNonBitmapImageCountingMemoryCache.getDebugData());
     }
     if (mEncodedCountingMemoryCache != null) {
       b.add("encodedCountingMemoryCache", mEncodedCountingMemoryCache.getDebugData());

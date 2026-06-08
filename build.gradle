@@ -44,8 +44,6 @@ subprojects {
         mavenCentral()
     }
 
-    // FIXME: This picks up non-Java files by default, failing to parse them.
-    // Need to configure this more carefully.
     tasks.withType(Javadoc).all {
         enabled = false
     }

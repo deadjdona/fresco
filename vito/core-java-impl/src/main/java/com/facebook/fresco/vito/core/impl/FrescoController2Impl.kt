@@ -104,6 +104,10 @@ open class FrescoController2Impl(
     // Save viewport dimension for future use
     drawable.viewportDimensions = viewportDimensions
 
+    if (config.enableRetriggerListenersIfImageAlreadySet()) {
+      drawable.retriggerListenersIfImageAlreadySet = true
+    }
+
     val forceReload = drawable.forceReloadIfImageAlreadySet
     val retriggerListeners = drawable.retriggerListenersIfImageAlreadySet
 
@@ -113,7 +117,6 @@ open class FrescoController2Impl(
       drawable.cancelReleaseDelayed()
       if (retriggerListeners) {
         val submitExtras = obtainExtras(null, null, drawable, imageRequest)
-        // Notify listeners that we're about to fetch an image
         drawable.internalListener.onSubmit(
             drawable.imageId,
             imageRequest,
@@ -121,7 +124,6 @@ open class FrescoController2Impl(
             submitExtras,
         )
         drawable.imagePerfListener.onImageFetch(drawable)
-        // image is set
         val actualImageDrawable = drawable.actualImageDrawable
         if (actualImageDrawable != null) {
           val finalExtras = drawable.tempFinalImageExtras
@@ -153,7 +155,6 @@ open class FrescoController2Impl(
     // We didn't -> Reset everything
     drawable.close()
     if (forceReload) {
-      // restore the forceReload flag
       drawable.forceReloadIfImageAlreadySet = true
     }
     if (retriggerListeners) {
@@ -561,7 +562,12 @@ open class FrescoController2Impl(
   companion object {
     private val COMPONENT_EXTRAS = ImmutableMap.of<String, Any>("component_tag", "vito2")
     private val SHORTCUT_EXTRAS =
-        ImmutableMap.of<String, Any>("origin", "memory_bitmap", "origin_sub", "shortcut")
+        ImmutableMap.of<String, Any>(
+            "origin",
+            "memory_bitmap",
+            HasExtraData.KEY_ORIGIN_SUBCATEGORY,
+            "shortcut",
+        )
     private const val TAG = "FrescoController2Impl"
     private const val EMPTY_IMAGE_ID = Long.MAX_VALUE
 

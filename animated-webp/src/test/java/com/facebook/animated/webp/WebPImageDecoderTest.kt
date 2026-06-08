@@ -33,6 +33,8 @@ import org.mockito.ArgumentMatchers
 import org.mockito.MockedConstruction
 import org.mockito.MockedStatic
 import org.mockito.Mockito
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
@@ -77,8 +79,8 @@ class WebPImageDecoderTest {
     val byteBuffer: TrivialPooledByteBuffer = createByteBuffer()
     whenever(
             WebPImage.createFromNativeMemory(
-                ArgumentMatchers.eq(byteBuffer.nativePtr),
-                ArgumentMatchers.eq(byteBuffer.size()),
+                eq(byteBuffer.nativePtr),
+                eq(byteBuffer.size()),
                 ArgumentMatchers.any<ImageDecodeOptions?>(ImageDecodeOptions::class.java),
             )
         )
@@ -114,8 +116,8 @@ class WebPImageDecoderTest {
     val byteBuffer: TrivialPooledByteBuffer = createByteBuffer()
     whenever(
             WebPImage.createFromNativeMemory(
-                ArgumentMatchers.eq(byteBuffer.nativePtr),
-                ArgumentMatchers.eq(byteBuffer.size()),
+                eq(byteBuffer.nativePtr),
+                eq(byteBuffer.size()),
                 ArgumentMatchers.any<ImageDecodeOptions?>(ImageDecodeOptions::class.java),
             )
         )
@@ -163,8 +165,8 @@ class WebPImageDecoderTest {
     val byteBuffer: TrivialPooledByteBuffer = createByteBuffer()
     whenever(
             WebPImage.createFromNativeMemory(
-                ArgumentMatchers.eq(byteBuffer.nativePtr),
-                ArgumentMatchers.eq(byteBuffer.size()),
+                eq(byteBuffer.nativePtr),
+                eq(byteBuffer.size()),
                 ArgumentMatchers.any<ImageDecodeOptions?>(ImageDecodeOptions::class.java),
             )
         )
@@ -222,7 +224,7 @@ class WebPImageDecoderTest {
     assertThat(imageResult?.hasDecodedFrame(0) == true).isFalse()
 
     // Should not have interacted with bitmap factory for basic decoding
-    mockBitmapFactory?.let { Mockito.verifyNoInteractions(it) }
+    mockBitmapFactory?.let { verifyNoInteractions(it) }
   }
 
   @Throws(Exception::class)
@@ -323,8 +325,8 @@ class WebPImageDecoderTest {
     val byteBuffer: TrivialPooledByteBuffer = createByteBuffer()
     whenever(
             WebPImage.createFromNativeMemory(
-                ArgumentMatchers.eq(byteBuffer.nativePtr),
-                ArgumentMatchers.eq(byteBuffer.size()),
+                eq(byteBuffer.nativePtr),
+                eq(byteBuffer.size()),
                 ArgumentMatchers.any<ImageDecodeOptions?>(ImageDecodeOptions::class.java),
             )
         )

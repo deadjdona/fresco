@@ -136,14 +136,27 @@ class KFrescoController(
         return false
       }
 
+      if (config.enableRetriggerListenersIfImageAlreadySet()) {
+        drawable.retriggerListenersIfImageAlreadySet = true
+      }
+
       val forceReload = drawable.forceReloadIfImageAlreadySet
       val retriggerListeners = drawable.retriggerListenersIfImageAlreadySet
 
       // Check if we already fetched that image
       if (!forceReload && isAlreadyLoadingImage(imageRequest, drawable)) {
         ImageReleaseScheduler.cancelAllReleasing(drawable)
-        if (retriggerListeners) {
-          // TODO: retrigger listeners
+        if (retriggerListeners && drawable.hasImage()) {
+          val closeableImage =
+              (drawable.closeable as? CloseableReference<*>)?.get() as? CloseableImage
+          drawable.listenerManager.onFinalImageSet(
+              drawable.imageId,
+              imageRequest,
+              ImageOrigin.MEMORY_BITMAP_SHORTCUT,
+              closeableImage?.imageInfo,
+              drawable.obtainExtras(imageExtras = closeableImage?.extras),
+              drawable.actualImageDrawable,
+          )
         }
         return true
       }
@@ -155,24 +168,43 @@ class KFrescoController(
       // We didn't -> reset everything and set up new fetch
       // TODO(T105148151): move to new package so that no legacy impl dep
       val imageId: Long = VitoUtils.generateIdentifier()
-      drawable.apply {
-        reset()
-        // Restore flags captured before reset
-        forceReloadIfImageAlreadySet = forceReload
-        retriggerListenersIfImageAlreadySet = retriggerListeners
+      val d = drawable
+      d.reset()
+      d.forceReloadIfImageAlreadySet = forceReload
+      d.retriggerListenersIfImageAlreadySet = retriggerListeners
 
-        this.imageRequest = imageRequest
-        this.callerContext = callerContext
-        imageListener = listener
-        listenerManager.setVitoImageRequestListener(globalImageRequestListener)
-        listenerManager.setLocalVitoImageRequestListener(vitoImageRequestListener)
+      d.imageRequest = imageRequest
+      d.callerContext = callerContext
+      d.imageListener = listener
+      d.listenerManager.setVitoImageRequestListener(globalImageRequestListener)
+      d.listenerManager.setLocalVitoImageRequestListener(vitoImageRequestListener)
 
-        // Setup local perf data listener
-        val localPerfStateListener = perfDataListener?.let(::ImagePerfDataNotifier)
-        listenerManager.setLocalImagePerfStateListener(localPerfStateListener)
+      // Setup local perf data listener
+      val localPerfStateListener = perfDataListener?.let(::ImagePerfDataNotifier)
+      d.listenerManager.setLocalImagePerfStateListener(localPerfStateListener)
 
-        _imageId = imageId
-        this.viewportDimensions = viewportDimensions
+      d._imageId = imageId
+      d.viewportDimensions = viewportDimensions
+      val useOfferBackBitmap = config.useOfferBackOnRelease()
+      val useOfferBackNonBitmap = config.useOfferBackOnReleaseForNonBitmapImage()
+      if (useOfferBackBitmap || useOfferBackNonBitmap) {
+        d.offerBackOnRelease = {
+          val req = d.imageRequest
+          val ref = d.closeable as? CloseableReference<*>
+          if (
+              req != null &&
+                  ref != null &&
+                  CloseableReference.isValid(ref) &&
+                  ref.get() is CloseableImage
+          ) {
+            val shouldOfferBack =
+                if (ref.get() is CloseableBitmap) useOfferBackBitmap else useOfferBackNonBitmap
+            if (shouldOfferBack) {
+              @Suppress("UNCHECKED_CAST")
+              vitoImagePipeline.returnImageToCache(req, ref as CloseableReference<CloseableImage>)
+            }
+          }
+        }
       }
 
       val options: ImageOptions = imageRequest.imageOptions
@@ -267,7 +299,7 @@ class KFrescoController(
       imageRequest: VitoImageRequest,
       imageId: Long,
   ) {
-    val extras = drawable.obtainExtras(null, null)
+    val extras = drawable.obtainExtras()
     drawable.actualImageLayer.setActualImageDrawable(imageRequest.imageOptions, actualImageDrawable)
     drawable.listenerManager.onFinalImageSet(
         imageId,
@@ -354,7 +386,7 @@ class KFrescoController(
               imageRequest,
               ImageOrigin.MEMORY_BITMAP_SHORTCUT,
               imageInfo,
-              obtainExtras(null, imageReference),
+              obtainExtras(image = imageReference),
               actualImageDrawable,
           )
         }

@@ -181,7 +181,12 @@ class GifWrapper {
       std::shared_ptr<DataWrapper>& pData)
       : m_spGifFile(std::move(pGifFile)),
         m_spData(pData),
-        m_rasterBits(m_spGifFile->SWidth * m_spGifFile->SHeight) {}
+        // Cast operands to size_t before multiplying to avoid signed int
+        // overflow (T260663777). Caller validates dimensions and product fits
+        // in INT_MAX before constructing this.
+        m_rasterBits(
+            static_cast<size_t>(m_spGifFile->SWidth) *
+            static_cast<size_t>(m_spGifFile->SHeight)) {}
 
   virtual ~GifWrapper() {
     // FBLOGD("Deleting GifWrapper");
@@ -339,7 +344,7 @@ static int directByteBufferReadFun(
     GifFileType* gifFileType,
     GifByteType* bytes,
     int size) {
-  DataWrapper* pData = (DataWrapper*)gifFileType->UserData;
+  DataWrapper* pData = static_cast<DataWrapper*>(gifFileType->UserData);
   if (size > 0) {
     return pData->read(bytes, size);
   }
@@ -463,14 +468,14 @@ int readSingleFrame(
   if (pSavedImage->ImageDesc.Width < 0 || pSavedImage->ImageDesc.Height < 0 ||
       pSavedImage->ImageDesc.Width > maxDimension ||
       pSavedImage->ImageDesc.Height > maxDimension) {
-    return GIF_ERROR;
+    goto error_cleanup;
   }
 
   // Check for image size overflow.
   if (pSavedImage->ImageDesc.Height != 0 &&
       pSavedImage->ImageDesc.Width >
           (INT_MAX / pSavedImage->ImageDesc.Height)) {
-    return GIF_ERROR;
+    goto error_cleanup;
   }
 
   if (decodeFramePixels) {
@@ -492,13 +497,13 @@ int readSingleFrame(
           GifPixelType* pLine = pRasterBits + j * pSavedImage->ImageDesc.Width;
           int lineLength = pSavedImage->ImageDesc.Width;
           if (DGifGetLine(pGifFile, pLine, lineLength) == GIF_ERROR) {
-            return GIF_ERROR;
+            goto error_cleanup;
           }
         }
       }
     } else {
       if (DGifGetLine(pGifFile, pRasterBits, imageSize) == GIF_ERROR) {
-        return GIF_ERROR;
+        goto error_cleanup;
       }
     }
   } else {
@@ -506,21 +511,13 @@ int readSingleFrame(
     int codeSize;
     GifByteType* pCodeBlock;
     if (DGifGetCode(pGifFile, &codeSize, &pCodeBlock) == GIF_ERROR) {
-      return GIF_ERROR;
+      goto error_cleanup;
     }
     while (pCodeBlock != NULL) {
       if (DGifGetCodeNext(pGifFile, &pCodeBlock) == GIF_ERROR) {
-        return GIF_ERROR;
+        goto error_cleanup;
       }
     }
-  }
-
-  if (pGifFile->ExtensionBlocks) {
-    pSavedImage->ExtensionBlocks = pGifFile->ExtensionBlocks;
-    pSavedImage->ExtensionBlockCount = pGifFile->ExtensionBlockCount;
-
-    pGifFile->ExtensionBlocks = nullptr;
-    pGifFile->ExtensionBlockCount = 0;
   }
 
   if (addToSavedImages) {
@@ -529,10 +526,34 @@ int readSingleFrame(
     // reset the value after calling DGifGetImageDesc. Now, as the result of
     // decoding is known to be successful, we can increment the value to
     // represent correct number of images.
+    if (pGifFile->ExtensionBlocks) {
+      pSavedImage->ExtensionBlocks = pGifFile->ExtensionBlocks;
+      pSavedImage->ExtensionBlockCount = pGifFile->ExtensionBlockCount;
+      pGifFile->ExtensionBlocks = nullptr;
+      pGifFile->ExtensionBlockCount = 0;
+    }
     pGifFile->ImageCount = imageCount + 1;
+  } else {
+    // DGifGetImageDesc allocated a ColorMap copy in the temporary SavedImage
+    // slot at SavedImages[imageCount]. Since we won't increment ImageCount,
+    // DGifCloseFile won't free this ColorMap. Clean it up now.
+    if (pSavedImage->ImageDesc.ColorMap) {
+      GifFreeMapObject(pSavedImage->ImageDesc.ColorMap);
+      pSavedImage->ImageDesc.ColorMap = NULL;
+    }
   }
 
   return GIF_OK;
+
+error_cleanup:
+  // DGifGetImageDesc allocated a ColorMap copy in the temporary SavedImage
+  // slot. Since we're not incrementing ImageCount, DGifCloseFile won't free
+  // this ColorMap. Clean it up to prevent a leak.
+  if (pSavedImage->ImageDesc.ColorMap) {
+    GifFreeMapObject(pSavedImage->ImageDesc.ColorMap);
+    pSavedImage->ImageDesc.ColorMap = NULL;
+  }
+  return GIF_ERROR;
 }
 
 /**
@@ -604,7 +625,7 @@ void parseApplicationExtensions(
     if (extensionBlock->ByteCount == APPLICATION_EXT_NETSCAPE_LEN &&
         strncmp(
             APPLICATION_EXT_NETSCAPE,
-            (const char*)extensionBlock->Bytes,
+            reinterpret_cast<const char*>(extensionBlock->Bytes),
             APPLICATION_EXT_NETSCAPE_LEN) == 0) {
       // The data sub-block has been added as the following extension block
       ExtensionBlock* subBlock = NULL;
@@ -728,7 +749,10 @@ jobject createFromDataWrapper(
 
   int gifError = 0;
   auto spGifFileIn = std::unique_ptr<GifFileType, decltype(&DGifCloseFile2)>{
-      DGifOpen((void*)spDataWrapper.get(), &directByteBufferReadFun, &gifError),
+      DGifOpen(
+          static_cast<void*>(spDataWrapper.get()),
+          &directByteBufferReadFun,
+          &gifError),
       DGifCloseFile2};
 
   if (spGifFileIn == nullptr) {
@@ -738,9 +762,18 @@ jobject createFromDataWrapper(
 
   int width = spGifFileIn->SWidth;
   int height = spGifFileIn->SHeight;
-  size_t wxh = width * height;
-  if (wxh < 1 || wxh > SIZE_MAX || width > maxDimension ||
+  // Validate dimensions before any multiplication to avoid signed int overflow
+  // (UB) that previously caused std::bad_alloc crashes in GifWrapper's
+  // m_rasterBits allocation (T260663777, T260663745).
+  if (width < 1 || height < 1 || width > maxDimension ||
       height > maxDimension) {
+    throwIllegalStateException(pEnv, "Invalid dimensions");
+    return nullptr;
+  }
+  // Multiply in size_t to avoid int overflow. Both operands are now
+  // guaranteed positive and bounded by maxDimension.
+  size_t wxh = static_cast<size_t>(width) * static_cast<size_t>(height);
+  if (wxh > static_cast<size_t>(INT_MAX)) {
     throwIllegalStateException(pEnv, "Invalid dimensions");
     return nullptr;
   }
@@ -860,8 +893,8 @@ getGifImageNativeContext(JNIEnv* pEnv, jobject thiz) {
       nullptr, releaser);
   pEnv->MonitorEnter(thiz);
   GifImageNativeContext* pNativeContext =
-      (GifImageNativeContext*)pEnv->GetLongField(
-          thiz, sGifImageFieldNativeContext);
+      reinterpret_cast<GifImageNativeContext*>(
+          pEnv->GetLongField(thiz, sGifImageFieldNativeContext));
   if (pNativeContext != nullptr) {
     pNativeContext->refCount++;
     ret.reset(pNativeContext);
@@ -887,7 +920,8 @@ jobject GifImage_nativeCreateFromDirectByteBuffer(
     jobject byteBuffer,
     jint maxDimension,
     jboolean forceStatic) {
-  jbyte* bbufInput = (jbyte*)pEnv->GetDirectBufferAddress(byteBuffer);
+  jbyte* bbufInput =
+      static_cast<jbyte*>(pEnv->GetDirectBufferAddress(byteBuffer));
   if (!bbufInput) {
     throwIllegalArgumentException(pEnv, "ByteBuffer must be direct");
     return 0;
@@ -920,7 +954,7 @@ jobject GifImage_nativeCreateFromNativeMemory(
     jint sizeInBytes,
     jint maxDimension,
     jboolean forceStatic) {
-  jbyte* const pointer = (jbyte*)nativePtr;
+  jbyte* const pointer = reinterpret_cast<jbyte*>(nativePtr);
 
   if (sizeInBytes < 0) {
     throwIllegalArgumentException(pEnv, "Size must be non-negative");
@@ -1158,8 +1192,8 @@ getGifFrameNativeContext(JNIEnv* pEnv, jobject thiz) {
       nullptr, releaser);
   pEnv->MonitorEnter(thiz);
   GifFrameNativeContext* pNativeContext =
-      (GifFrameNativeContext*)pEnv->GetLongField(
-          thiz, sGifFrameFieldNativeContext);
+      reinterpret_cast<GifFrameNativeContext*>(
+          pEnv->GetLongField(thiz, sGifFrameFieldNativeContext));
   if (pNativeContext != nullptr) {
     pNativeContext->refCount++;
     ret.reset(pNativeContext);
@@ -1212,8 +1246,8 @@ jint GifImage_nativeIsAnimated(JNIEnv* pEnv, jobject thiz) {
 void GifImage_nativeDispose(JNIEnv* pEnv, jobject thiz) {
   pEnv->MonitorEnter(thiz);
   GifImageNativeContext* pNativeContext =
-      (GifImageNativeContext*)pEnv->GetLongField(
-          thiz, sGifImageFieldNativeContext);
+      reinterpret_cast<GifImageNativeContext*>(
+          pEnv->GetLongField(thiz, sGifImageFieldNativeContext));
   if (pNativeContext != nullptr) {
     pEnv->SetLongField(thiz, sGifImageFieldNativeContext, 0);
     GifImageNativeContext_releaseRef(pEnv, thiz, pNativeContext);
@@ -1323,7 +1357,11 @@ static void blitNormal(
 
   for (; copyHeight > 0; copyHeight--) {
     blitLine(
-        (PixelType32*)pDest, pSrcRasterBits, cmap, transparentIndex, copyWidth);
+        reinterpret_cast<PixelType32*>(pDest),
+        pSrcRasterBits,
+        cmap,
+        transparentIndex,
+        copyWidth);
     pSrcRasterBits += pFrame->ImageDesc.Width;
     pDest += destStride;
   }
@@ -1585,8 +1623,8 @@ jint GifFrame_nativeGetDisposalMode(JNIEnv* pEnv, jobject thiz) {
 void GifFrame_nativeDispose(JNIEnv* pEnv, jobject thiz) {
   pEnv->MonitorEnter(thiz);
   GifFrameNativeContext* pNativeContext =
-      (GifFrameNativeContext*)pEnv->GetLongField(
-          thiz, sGifFrameFieldNativeContext);
+      reinterpret_cast<GifFrameNativeContext*>(
+          pEnv->GetLongField(thiz, sGifFrameFieldNativeContext));
   if (pNativeContext) {
     pEnv->SetLongField(thiz, sGifFrameFieldNativeContext, 0);
     GifFrameNativeContext_releaseRef(pEnv, thiz, pNativeContext);

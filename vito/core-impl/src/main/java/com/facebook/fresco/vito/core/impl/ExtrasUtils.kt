@@ -9,6 +9,7 @@ package com.facebook.fresco.vito.core.impl
 
 import com.facebook.common.references.CloseableReference
 import com.facebook.datasource.DataSource
+import com.facebook.fresco.middleware.HasExtraData
 import com.facebook.fresco.middleware.MiddlewareUtils
 import com.facebook.fresco.ui.common.ControllerListener2
 import com.facebook.imagepipeline.image.CloseableImage
@@ -16,11 +17,12 @@ import com.facebook.imagepipeline.image.CloseableImage
 private val COMPONENT_EXTRAS: Map<String, Any> = mapOf("component_tag" to "vito2")
 
 private val SHORTCUT_EXTRAS: Map<String, Any> =
-    mapOf("origin" to "memory_bitmap", "origin_sub" to "shortcut")
+    mapOf("origin" to "memory_bitmap", HasExtraData.KEY_ORIGIN_SUBCATEGORY to "shortcut")
 
 fun KFrescoVitoDrawable.obtainExtras(
     dataSource: DataSource<CloseableReference<CloseableImage>>? = null,
     image: CloseableReference<CloseableImage>? = null,
+    imageExtras: Map<String, Any>? = null,
 ): ControllerListener2.Extras =
     MiddlewareUtils.obtainExtras(
         COMPONENT_EXTRAS,
@@ -30,7 +32,15 @@ fun KFrescoVitoDrawable.obtainExtras(
         viewportDimensions,
         imageRequest?.imageOptions?.actualImageScaleType,
         imageRequest?.imageOptions?.actualImageFocusPoint,
-        image?.get()?.extras,
+        imageExtras
+            ?: try {
+              image?.get()?.extras
+            } catch (_: IllegalStateException) {
+              // The CloseableReference may have been closed concurrently (e.g. during
+              // KFrescoVitoDrawable.reset()), in which case get() throws. Returning null
+              // extras is safe since the image is being released anyway.
+              null
+            },
         callerContext,
         imageRequest?.logWithHighSamplingRate ?: false,
         imageRequest?.finalImageRequest?.sourceUri,

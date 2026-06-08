@@ -33,8 +33,8 @@ import java.io.RandomAccessFile
 import java.util.Locale
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.TimeUnit
+import kotlin.test.fail
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -43,6 +43,7 @@ import org.mockito.ArgumentCaptor
 import org.mockito.InOrder
 import org.mockito.MockedStatic
 import org.mockito.Mockito
+import org.mockito.kotlin.times
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
@@ -252,9 +253,7 @@ class DiskStorageCacheTest {
 
     // The cache size should be the size of the second + third files
     val cacheSize = this@DiskStorageCacheTest.cache!!.getSize()
-    assertThat(cacheSize)
-        .`as`(String.format(Locale.US, "Expected cache size of %d but is %d", 205, cacheSize))
-        .isEqualTo(205L)
+    assertThat(cacheSize).`as`("Expected cache size of 205 but is $cacheSize").isEqualTo(205L)
 
     // Write another non-cache, non-lru file in the cache directory
     val unexpected3 = File(cacheDirectory, "unexpected3")
@@ -761,7 +760,7 @@ class DiskStorageCacheTest {
     val numberItems = resourceIds.size
     val cacheEventCaptor = ArgumentCaptor.forClass<CacheEvent?, CacheEvent?>(CacheEvent::class.java)
     cacheEventListenerInOrder!!
-        .verify<CacheEventListener?>(cacheEventListener, Mockito.times(numberItems))
+        .verify<CacheEventListener?>(cacheEventListener, times(numberItems))
         .onEviction(cacheEventCaptor.capture())
 
     val found = BooleanArray(numberItems)

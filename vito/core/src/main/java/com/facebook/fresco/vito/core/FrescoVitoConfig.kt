@@ -99,4 +99,36 @@ interface FrescoVitoConfig {
   fun enablePrepareToDrawOnFetch(): Boolean
 
   fun experimentalOptimizeAlphaHandling(): Boolean
+
+  fun enableRetriggerListenersIfImageAlreadySet(): Boolean
+
+  fun fixOnBindRetriggerListenersClobber(): Boolean = false
+
+  fun disableBitmapCacheShortcut(): Boolean = false
+
+  /**
+   * Enables offer-back-on-release for `CloseableBitmap` images. When on, the drawable's image
+   * reference is re-offered to the memory cache when the Vito drawable is reset, instead of being
+   * closed immediately — letting the cache potentially reuse the entry on the next request.
+   *
+   * Applies only to `CloseableBitmap` instances; for non-bitmap images use
+   * [useOfferBackOnReleaseForNonBitmapImage].
+   */
+  fun useOfferBackOnRelease(): Boolean = false
+
+  /**
+   * Enables offer-back-on-release for non-`CloseableBitmap` images (animated images, XML/SVG
+   * decodes, etc.). When the new non-bitmap memory cache is enabled via
+   * `experiments.useSeparateNonBitmapImageCache`, offered-back entries land in that cache.
+   */
+  fun useOfferBackOnReleaseForNonBitmapImage(): Boolean = false
+
+  /**
+   * When on, an image is released immediately when its view becomes non-visible (e.g. scrolled off
+   * screen) instead of on the next frame. Releasing sooner drops the drawable's strong reference to
+   * the underlying bitmap earlier, making it eligible for GC while scrolling rather than only after
+   * the view detaches. Trade-off: an item that scrolls off and quickly back triggers a re-fetch
+   * (usually a memory-cache hit). Default off; gated behind an A/B flag.
+   */
+  fun releaseImageOnVisibilityGoneImmediately(): Boolean = false
 }

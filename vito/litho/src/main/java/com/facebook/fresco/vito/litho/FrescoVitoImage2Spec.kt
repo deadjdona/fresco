@@ -171,8 +171,7 @@ object FrescoVitoImage2Spec {
               logWithHighSamplingRate ?: false,
               viewportRect,
               callerContext,
-              null,
-              fetchStrategy,
+              fetchStrategy = fetchStrategy,
           )
 
   @JvmStatic
@@ -351,7 +350,13 @@ object FrescoVitoImage2Spec {
       request.putExtra(HasExtraData.KEY_SF_FETCH_STRATEGY, fetchStrategy)
 
       forceReloadImageIfAlreadySet?.let { frescoDrawable.forceReloadIfImageAlreadySet = it }
-      retriggerListenersIfImageAlreadySet?.let { frescoDrawable.forceReloadIfImageAlreadySet = it }
+      retriggerListenersIfImageAlreadySet?.let {
+        if (FrescoVitoProvider.getConfig().fixOnBindRetriggerListenersClobber()) {
+          frescoDrawable.retriggerListenersIfImageAlreadySet = it
+        } else {
+          frescoDrawable.forceReloadIfImageAlreadySet = it
+        }
+      }
       // We fetch in both mount and bind in case an unbind event triggered a delayed release.
       // We'll only trigger an actual fetch if needed. Most of the time, this will be a no-op.
       FrescoVitoProvider.getController()

@@ -145,6 +145,9 @@ class VitoImagePipelineImpl(
 
   override fun getCachedImage(imageRequest: VitoImageRequest): CloseableReference<CloseableImage>? =
       traceSection("VitoImagePipeline#getCachedImage") {
+        if (config.disableBitmapCacheShortcut()) {
+          return null
+        }
         val cachedImageReference = imagePipeline.getCachedImage(imageRequest.finalImageCacheKey)
         if (CloseableReference.isValid(cachedImageReference)) {
           cachedImageReference
@@ -194,6 +197,14 @@ class VitoImagePipelineImpl(
     } catch (t: Throwable) {
       null
     }
+  }
+
+  override fun returnImageToCache(
+      imageRequest: VitoImageRequest,
+      imageReference: CloseableReference<CloseableImage>,
+  ) {
+    val cacheKey = imageRequest.finalImageCacheKey ?: return
+    imagePipeline.returnImageToCache(cacheKey, imageReference)
   }
 
   override fun evictFromCaches(imageRequest: VitoImageRequest) {

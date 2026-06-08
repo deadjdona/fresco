@@ -39,7 +39,6 @@ import com.facebook.litho.annotations.Prop
 import com.facebook.litho.annotations.PropDefault
 import com.facebook.litho.annotations.ResType
 import com.facebook.litho.annotations.State
-import com.facebook.litho.widget.Image
 
 @LayoutSpec
 object FrescoVitoTapToRetryImageSpec {
@@ -91,7 +90,7 @@ object FrescoVitoTapToRetryImageSpec {
       val scaledRetryDrawable =
           if (retryImageScaleType == null || retryImage == null) retryImage
           else ScaleTypeDrawable(retryImage, retryImageScaleType)
-      return Image.create(c)
+      return com.facebook.litho.widget.Image.create(c)
           .drawable(scaledRetryDrawable)
           .scaleType(ImageView.ScaleType.FIT_XY)
           .clickHandler(FrescoVitoTapToRetryImage.onRetryClickEvent(c))

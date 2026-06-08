@@ -11,6 +11,7 @@ package com.facebook.fresco.vito.core.impl
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import com.facebook.fresco.middleware.HasExtraData
 import com.facebook.fresco.ui.common.ControllerListener2.Extras
 import com.facebook.fresco.vito.core.FrescoDrawableInterface
 import com.facebook.fresco.vito.core.impl.debug.DebugOverlayImageOriginColor
@@ -107,7 +108,8 @@ val imageOriginSubcategoryProvider =
     ) { drawable, _ ->
       if (drawable is KFrescoVitoDrawable) {
         val originSubcategory =
-            drawable.extractOriginExtras()?.get("origin_sub")?.toString() ?: "unknown"
+            drawable.extractOriginExtras()?.get(HasExtraData.KEY_ORIGIN_SUBCATEGORY)?.toString()
+                ?: "unknown"
 
         originSubcategory to Color.GRAY
       } else {
@@ -187,7 +189,12 @@ fun createWastedMemoryProvider(
           val targetHeight =
               if (viewport != null && viewport.height() > 0) viewport.height()
               else drawable.bounds.height()
-          val bytesPerPixel = BitmapUtil.getPixelSizeForBitmapConfig(model.bitmap.config)
+          val bytesPerPixel =
+              try {
+                BitmapUtil.getPixelSizeForBitmapConfig(model.bitmap.config)
+              } catch (_: UnsupportedOperationException) {
+                BitmapUtil.ARGB_8888_BYTES_PER_PIXEL
+              }
           computeWastedMemoryAndColor(
               model.width,
               model.height,
